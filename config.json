@@ -35,10 +35,5 @@
       "precio": 30,
       "duracion": 45
     }
-  ],
-  "whatsapp": {
-    "accessToken": "TU_TOKEN_AQUI",
-    "phoneNumberId": "TU_ID_AQUI",
-    "verifyToken": "mi_token_secreto_123"
-  }
+  ]
 }
