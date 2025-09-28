@@ -1,15 +1,16 @@
 {
-  "name": "bot-whatsapp-salon",
+  "name": "bot-whatsapp-salon-qr",
   "version": "1.0.0",
-  "description": "Bot WhatsApp para gestión de citas",
+  "description": "Bot WhatsApp con QR - Sin APIs complicadas",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "body-parser": "^1.20.2",
-    "axios": "^1.6.0"
+    "whatsapp-web.js": "^1.23.0",
+    "qrcode": "^1.5.3",
+    "socket.io": "^4.7.2"
   },
   "engines": {
     "node": "18.x"
