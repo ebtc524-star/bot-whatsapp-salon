@@ -1,18 +1,104 @@
 const express = require('express');
-const bodyParser = require('body-parser');
-const axios = require('axios');
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const qrcode = require('qrcode');
+const http = require('http');
+const socketIo = require('socket.io');
 const fs = require('fs');
 
-// Cargar configuración
-const config = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
 
-app.use(bodyParser.json());
+app.use(express.json());
 app.use(express.static('.'));
 
-// Base de datos simple en memoria
+// Cargar configuración
+let config = {};
+try {
+    config = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
+} catch (error) {
+    console.log('Usando configuración por defecto');
+    config = {
+        salon: { nombre: "Salon María" },
+        horario: { apertura: "09:00", cierre: "20:00", diasLaborables: [1,2,3,4,5,6] },
+        peluqueros: [{ nombre: "María", especialidad: "Corte y Color" }],
+        servicios: [{ nombre: "Corte", precio: 25, duracion: 30 }]
+    };
+}
+
+// Base de datos simple
 let citas = [];
 let conversaciones = {};
+let clienteWhatsApp = null;
+let qrCodeData = '';
+let estadoConexion = 'disconnected';
+
+// ===============================
+// CLIENTE WHATSAPP WEB
+// ===============================
+const client = new Client({
+    authStrategy: new LocalAuth({
+        dataPath: './whatsapp-session'
+    }),
+    puppeteer: {
+        headless: true,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--disable-gpu'
+        ]
+    }
+});
+
+// ===============================
+// EVENTOS WHATSAPP
+// ===============================
+client.on('qr', (qr) => {
+    console.log('📱 QR Code generado');
+    qrcode.toDataURL(qr, (err, url) => {
+        qrCodeData = url;
+        estadoConexion = 'qr_ready';
+        io.emit('qr', url);
+    });
+});
+
+client.on('ready', () => {
+    console.log('✅ WhatsApp conectado correctamente!');
+    estadoConexion = 'connected';
+    qrCodeData = '';
+    io.emit('connected', true);
+});
+
+client.on('authenticated', () => {
+    console.log('🔐 Autenticación exitosa');
+    estadoConexion = 'authenticated';
+});
+
+client.on('auth_failure', () => {
+    console.log('❌ Error de autenticación');
+    estadoConexion = 'auth_failure';
+    io.emit('auth_failure');
+});
+
+client.on('disconnected', (reason) => {
+    console.log('📱 WhatsApp desconectado:', reason);
+    estadoConexion = 'disconnected';
+    io.emit('disconnected');
+});
+
+client.on('message', async (message) => {
+    if (!message.fromMe && message.body) {
+        const respuesta = procesarMensaje(message.body, message.from);
+        if (respuesta) {
+            await message.reply(respuesta);
+        }
+    }
+});
 
 // ===============================
 // VERIFICAR HORARIO COMERCIAL
@@ -21,7 +107,7 @@ function estaAbierto() {
     const ahora = new Date();
     const hora = ahora.getHours();
     const minutos = ahora.getMinutes();
-    const diaSemana = ahora.getDay(); // 0=domingo, 1=lunes...
+    const diaSemana = ahora.getDay();
     
     const horaActual = hora * 60 + minutos;
     const apertura = parseInt(config.horario.apertura.split(':')[0]) * 60 + parseInt(config.horario.apertura.split(':')[1]);
@@ -33,7 +119,7 @@ function estaAbierto() {
 }
 
 // ===============================
-// LÓGICA DEL BOT
+// LÓGICA DEL BOT (IGUAL QUE ANTES)
 // ===============================
 function procesarMensaje(mensaje, telefono) {
     if (!estaAbierto()) {
@@ -91,10 +177,14 @@ function procesarMensaje(mensaje, telefono) {
                     servicio: estado.servicio.nombre,
                     peluquero: estado.peluquero.nombre,
                     precio: estado.servicio.precio,
-                    confirmada: true
+                    confirmada: true,
+                    fechaCreacion: new Date()
                 };
                 citas.push(nuevaCita);
                 delete conversaciones[telefono];
+                
+                // Notificar al panel en tiempo real
+                io.emit('nueva_cita', nuevaCita);
                 
                 return `🎉 ¡CITA CONFIRMADA!\n\nTe esperamos el ${estado.fechaHora} 😊\n\nTe enviaremos un recordatorio 24h antes 📱\n\n¡Gracias por confiar en ${config.salon.nombre}! 💕`;
             }
@@ -109,71 +199,22 @@ function procesarMensaje(mensaje, telefono) {
 }
 
 // ===============================
-// WEBHOOK WHATSAPP
-// ===============================
-app.get('/webhook', (req, res) => {
-    const VERIFY_TOKEN = config.whatsapp.verifyToken;
-    const mode = req.query['hub.mode'];
-    const token = req.query['hub.verify_token'];
-    const challenge = req.query['hub.challenge'];
-
-    if (mode && token === VERIFY_TOKEN) {
-        res.status(200).send(challenge);
-    } else {
-        res.sendStatus(403);
-    }
-});
-
-app.post('/webhook', (req, res) => {
-    const body = req.body;
-
-    if (body.object === 'whatsapp_business_account') {
-        body.entry.forEach(entry => {
-            const changes = entry.changes[0];
-            if (changes.field === 'messages') {
-                const messages = changes.value.messages;
-                if (messages) {
-                    messages.forEach(message => {
-                        const telefono = message.from;
-                        const texto = message.text?.body;
-                        
-                        if (texto) {
-                            const respuesta = procesarMensaje(texto, telefono);
-                            enviarMensaje(telefono, respuesta);
-                        }
-                    });
-                }
-            }
-        });
-    }
-    res.status(200).send('OK');
-});
-
-// ===============================
-// ENVIAR MENSAJE WHATSAPP
-// ===============================
-async function enviarMensaje(telefono, mensaje) {
-    try {
-        await axios.post(`https://graph.facebook.com/v18.0/${config.whatsapp.phoneNumberId}/messages`, {
-            messaging_product: 'whatsapp',
-            to: telefono,
-            text: { body: mensaje }
-        }, {
-            headers: {
-                'Authorization': `Bearer ${config.whatsapp.accessToken}`,
-                'Content-Type': 'application/json'
-            }
-        });
-    } catch (error) {
-        console.error('Error enviando mensaje:', error);
-    }
-}
-
-// ===============================
-// PANEL WEB
+// RUTAS WEB
 // ===============================
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/panel.html');
+});
+
+app.get('/api/estado', (req, res) => {
+    res.json({
+        estado: estadoConexion,
+        abierto: estaAbierto(),
+        citas: citas.length
+    });
+});
+
+app.get('/api/qr', (req, res) => {
+    res.json({ qr: qrCodeData });
 });
 
 app.get('/api/citas', (req, res) => {
@@ -185,17 +226,52 @@ app.get('/api/config', (req, res) => {
 });
 
 app.post('/api/config', (req, res) => {
-    Object.assign(config, req.body);
+    config = { ...config, ...req.body };
     fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
     res.json({ success: true });
 });
 
+app.post('/api/reconectar', (req, res) => {
+    if (estadoConexion !== 'connected') {
+        client.initialize();
+    }
+    res.json({ success: true });
+});
+
 // ===============================
-// INICIAR SERVIDOR
+// SOCKET.IO PARA TIEMPO REAL
+// ===============================
+io.on('connection', (socket) => {
+    console.log('🔌 Panel conectado');
+    
+    socket.emit('estado', {
+        conexion: estadoConexion,
+        abierto: estaAbierto(),
+        citas: citas.length
+    });
+    
+    if (qrCodeData) {
+        socket.emit('qr', qrCodeData);
+    }
+});
+
+// ===============================
+// INICIAR SERVIDOR Y WHATSAPP
 // ===============================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+
+server.listen(PORT, () => {
     console.log(`🚀 Bot WhatsApp ejecutándose en puerto ${PORT}`);
     console.log(`📱 Panel: http://localhost:${PORT}`);
-    console.log(`⏰ Estado: ${estaAbierto() ? 'ABIERTO' : 'CERRADO'}`);
+    console.log('📞 Iniciando WhatsApp Web...');
+    
+    // Inicializar WhatsApp Web
+    client.initialize();
+});
+
+// Manejar cierre limpio
+process.on('SIGINT', async () => {
+    console.log('🛑 Cerrando bot...');
+    await client.destroy();
+    process.exit(0);
 });
