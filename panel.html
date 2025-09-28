@@ -3,84 +3,214 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel - Bot WhatsApp</title>
+    <title>Panel - Bot WhatsApp QR</title>
+    <script src="/socket.io/socket.io.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; }
-        .header { background: #25D366; color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
-        .card { background: white; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .btn { background: #25D366; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
-        .btn:hover { background: #128C7E; }
-        input, select { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; }
-        .status { padding: 5px 10px; border-radius: 20px; font-size: 14px; font-weight: bold; }
-        .status.abierto { background: #d4edda; color: #155724; }
-        .status.cerrado { background: #f8d7da; color: #721c24; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background: #f8f9fa; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .header { background: linear-gradient(135deg, #25D366, #128C7E); color: white; padding: 30px; border-radius: 15px; margin-bottom: 20px; text-align: center; }
+        .card { background: white; border-radius: 15px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .btn { background: #25D366; color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; margin: 5px; font-weight: bold; }
+        .btn:hover { background: #128C7E; transform: translateY(-2px); transition: 0.3s; }
+        .btn.danger { background: #dc3545; }
+        .btn.danger:hover { background: #c82333; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; }
+        input:focus { border-color: #25D366; outline: none; }
+        .status { padding: 8px 15px; border-radius: 25px; font-size: 14px; font-weight: bold; margin: 0 10px; }
+        .status.connected { background: #d4edda; color: #155724; }
+        .status.disconnected { background: #f8d7da; color: #721c24; }
+        .status.connecting { background: #fff3cd; color: #856404; }
+        .qr-container { text-align: center; padding: 20px; }
+        .qr-code { max-width: 300px; margin: 20px auto; border: 3px solid #25D366; border-radius: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 2px solid #eee; }
+        th { background: #f8f9fa; font-weight: bold; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .notification { background: #25D366; color: white; padding: 15px; border-radius: 8px; margin: 10px 0; animation: slideIn 0.5s; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>🤖 Bot WhatsApp - Panel Control</h1>
-            <p>Estado actual: <span id="estado" class="status">Cargando...</span></p>
+            <p>Conecta tu WhatsApp Business con un simple escaneo</p>
+            <div style="margin-top: 15px;">
+                Estado: <span id="estadoConexion" class="status">Cargando...</span>
+                <span id="estadoSalon" class="status">Cargando...</span>
+            </div>
         </div>
 
+        <!-- CONEXIÓN WHATSAPP -->
         <div class="card">
-            <h2>📋 Citas Reservadas</h2>
-            <div id="citasLista">Cargando citas...</div>
-            <button class="btn" onclick="cargarCitas()">🔄 Actualizar</button>
+            <h2>📱 Conexión WhatsApp</h2>
+            <div id="conexionContent">
+                <div id="qrSection" style="display: none;">
+                    <div class="qr-container">
+                        <h3>📱 Escanea este QR desde tu WhatsApp Business</h3>
+                        <p>Abre WhatsApp → Menú (3 puntos) → WhatsApp Web → Escanear código QR</p>
+                        <img id="qrImage" class="qr-code" style="display: none;">
+                        <div id="qrLoading">Generando código QR...</div>
+                    </div>
+                </div>
+                
+                <div id="conectadoSection" style="display: none;">
+                    <div style="text-align: center; padding: 20px;">
+                        <h3 style="color: #25D366;">✅ WhatsApp Conectado Correctamente</h3>
+                        <p>Tu bot está recibiendo y enviando mensajes</p>
+                        <button class="btn danger" onclick="desconectar()">🔌 Desconectar WhatsApp</button>
+                    </div>
+                </div>
+                
+                <div id="desconectadoSection">
+                    <div style="text-align: center; padding: 20px;">
+                        <h3>📱 WhatsApp No Conectado</h3>
+                        <p>Haz click para generar el código QR</p>
+                        <button class="btn" onclick="conectar()">🔗 Conectar WhatsApp</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="card">
-            <h2>⚙️ Configuración Rápida</h2>
-            <div>
-                <label>Nombre del Salón:</label>
-                <input type="text" id="salonNombre" placeholder="Salon María">
+        <div class="grid">
+            <!-- CITAS -->
+            <div class="card">
+                <h2>📅 Citas Reservadas <span id="contadorCitas" class="status connected">0</span></h2>
+                <div id="citasLista">Cargando citas...</div>
+                <button class="btn" onclick="cargarCitas()">🔄 Actualizar</button>
             </div>
-            <div>
-                <label>Horario de Apertura:</label>
-                <input type="time" id="horarioApertura" value="09:00">
+
+            <!-- CONFIGURACIÓN -->
+            <div class="card">
+                <h2>⚙️ Configuración Rápida</h2>
+                <div>
+                    <label>Nombre del Salón:</label>
+                    <input type="text" id="salonNombre" placeholder="Salon María">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label>Apertura:</label>
+                        <input type="time" id="horarioApertura" value="09:00">
+                    </div>
+                    <div>
+                        <label>Cierre:</label>
+                        <input type="time" id="horarioCierre" value="20:00">
+                    </div>
+                </div>
+                <button class="btn" onclick="guardarConfig()">💾 Guardar Configuración</button>
             </div>
-            <div>
-                <label>Horario de Cierre:</label>
-                <input type="time" id="horarioCierre" value="20:00">
-            </div>
-            <button class="btn" onclick="guardarConfig()">💾 Guardar</button>
         </div>
 
-        <div class="card">
-            <h2>🔗 Configuración WhatsApp</h2>
-            <p><strong>URL del Webhook:</strong></p>
-            <p id="webhookUrl" style="background: #f8f9fa; padding: 10px; border-radius: 5px; word-break: break-all;">
-                Cargando URL...
-            </p>
-            <p><small>Copia esta URL y úsala en la configuración de WhatsApp Business API</small></p>
-        </div>
+        <!-- NOTIFICACIONES -->
+        <div id="notificaciones"></div>
     </div>
 
     <script>
+        const socket = io();
         let config = {};
 
-        async function cargarTodo() {
-            await cargarConfig();
-            await cargarCitas();
-            actualizarEstado();
-            mostrarWebhookUrl();
+        // ===============================
+        // SOCKET.IO - TIEMPO REAL
+        // ===============================
+        socket.on('qr', (qrData) => {
+            document.getElementById('qrImage').src = qrData;
+            document.getElementById('qrImage').style.display = 'block';
+            document.getElementById('qrLoading').style.display = 'none';
+            mostrarSeccion('qr');
+        });
+
+        socket.on('connected', () => {
+            mostrarSeccion('conectado');
+            actualizarEstado('connected');
+            mostrarNotificacion('✅ WhatsApp conectado correctamente!', 'success');
+        });
+
+        socket.on('disconnected', () => {
+            mostrarSeccion('desconectado');
+            actualizarEstado('disconnected');
+            mostrarNotificacion('❌ WhatsApp desconectado', 'error');
+        });
+
+        socket.on('nueva_cita', (cita) => {
+            mostrarNotificacion(`🎉 Nueva cita: ${cita.servicio} - ${cita.fecha}`, 'success');
+            cargarCitas();
+        });
+
+        socket.on('estado', (estado) => {
+            actualizarEstado(estado.conexion);
+            actualizarEstadoSalon(estado.abierto);
+            document.getElementById('contadorCitas').textContent = estado.citas;
+        });
+
+        // ===============================
+        // FUNCIONES UI
+        // ===============================
+        function mostrarSeccion(seccion) {
+            document.getElementById('qrSection').style.display = seccion === 'qr' ? 'block' : 'none';
+            document.getElementById('conectadoSection').style.display = seccion === 'conectado' ? 'block' : 'none';
+            document.getElementById('desconectadoSection').style.display = seccion === 'desconectado' ? 'block' : 'none';
         }
 
-        async function cargarConfig() {
+        function actualizarEstado(estado) {
+            const el = document.getElementById('estadoConexion');
+            el.className = 'status';
+            
+            switch(estado) {
+                case 'connected':
+                    el.textContent = 'CONECTADO';
+                    el.classList.add('connected');
+                    break;
+                case 'qr_ready':
+                    el.textContent = 'ESPERANDO QR';
+                    el.classList.add('connecting');
+                    break;
+                case 'disconnected':
+                    el.textContent = 'DESCONECTADO';
+                    el.classList.add('disconnected');
+                    break;
+                default:
+                    el.textContent = 'CONECTANDO...';
+                    el.classList.add('connecting');
+            }
+        }
+
+        function actualizarEstadoSalon(abierto) {
+            const el = document.getElementById('estadoSalon');
+            el.textContent = abierto ? 'ABIERTO' : 'CERRADO';
+            el.className = 'status ' + (abierto ? 'connected' : 'disconnected');
+        }
+
+        function mostrarNotificacion(mensaje, tipo) {
+            const div = document.createElement('div');
+            div.className = 'notification';
+            div.textContent = mensaje;
+            document.getElementById('notificaciones').appendChild(div);
+            
+            setTimeout(() => {
+                div.remove();
+            }, 5000);
+        }
+
+        // ===============================
+        // ACCIONES
+        // ===============================
+        async function conectar() {
+            mostrarNotificacion('🔄 Conectando WhatsApp...', 'info');
             try {
-                const response = await fetch('/api/config');
-                config = await response.json();
-                
-                document.getElementById('salonNombre').value = config.salon.nombre;
-                document.getElementById('horarioApertura').value = config.horario.apertura;
-                document.getElementById('horarioCierre').value = config.horario.cierre;
+                await fetch('/api/reconectar', { method: 'POST' });
+                mostrarSeccion('qr');
+                document.getElementById('qrLoading').style.display = 'block';
+                document.getElementById('qrImage').style.display = 'none';
             } catch (error) {
-                console.error('Error cargando config:', error);
+                mostrarNotificacion('❌ Error al conectar', 'error');
+            }
+        }
+
+        async function desconectar() {
+            if (confirm('¿Seguro que quieres desconectar WhatsApp?')) {
+                mostrarNotificacion('🔄 Desconectando...', 'info');
+                location.reload(); // Reiniciar página
             }
         }
 
@@ -90,8 +220,10 @@
                 const citas = await response.json();
                 
                 const lista = document.getElementById('citasLista');
+                document.getElementById('contadorCitas').textContent = citas.length;
+                
                 if (citas.length === 0) {
-                    lista.innerHTML = '<p>No hay citas reservadas</p>';
+                    lista.innerHTML = '<p style="text-align: center; color: #666;">No hay citas reservadas</p>';
                 } else {
                     lista.innerHTML = `
                         <table>
@@ -101,38 +233,34 @@
                                     <td>${c.fecha}</td>
                                     <td>${c.servicio}</td>
                                     <td>${c.peluquero}</td>
-                                    <td>${c.precio}€</td>
+                                    <td style="font-weight: bold; color: #25D366;">${c.precio}€</td>
                                 </tr>
                             `).join('')}
                         </table>
                     `;
                 }
             } catch (error) {
-                console.error('Error cargando citas:', error);
+                mostrarNotificacion('❌ Error cargando citas', 'error');
             }
         }
 
-        function actualizarEstado() {
-            const ahora = new Date();
-            const hora = ahora.getHours();
-            const dia = ahora.getDay();
-            
-            const apertura = parseInt(config.horario.apertura.split(':')[0]);
-            const cierre = parseInt(config.horario.cierre.split(':')[0]);
-            
-            const abierto = config.horario.diasLaborables.includes(dia) && hora >= apertura && hora <= cierre;
-            
-            const estadoEl = document.getElementById('estado');
-            estadoEl.textContent = abierto ? 'ABIERTO' : 'CERRADO';
-            estadoEl.className = 'status ' + (abierto ? 'abierto' : 'cerrado');
-        }
-
-        function mostrarWebhookUrl() {
-            const url = window.location.origin + '/webhook';
-            document.getElementById('webhookUrl').textContent = url;
+        async function cargarConfig() {
+            try {
+                const response = await fetch('/api/config');
+                config = await response.json();
+                
+                document.getElementById('salonNombre').value = config.salon?.nombre || '';
+                document.getElementById('horarioApertura').value = config.horario?.apertura || '09:00';
+                document.getElementById('horarioCierre').value = config.horario?.cierre || '20:00';
+            } catch (error) {
+                console.error('Error cargando config:', error);
+            }
         }
 
         async function guardarConfig() {
+            config.salon = config.salon || {};
+            config.horario = config.horario || {};
+            
             config.salon.nombre = document.getElementById('salonNombre').value;
             config.horario.apertura = document.getElementById('horarioApertura').value;
             config.horario.cierre = document.getElementById('horarioCierre').value;
@@ -143,18 +271,24 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(config)
                 });
-                alert('✅ Configuración guardada');
-                actualizarEstado();
+                mostrarNotificacion('✅ Configuración guardada', 'success');
             } catch (error) {
-                alert('❌ Error guardando configuración');
+                mostrarNotificacion('❌ Error guardando configuración', 'error');
             }
         }
 
-        // Cargar todo al inicio
-        cargarTodo();
-        
-        // Actualizar cada minuto
-        setInterval(actualizarEstado, 60000);
+        // ===============================
+        // INICIALIZACIÓN
+        // ===============================
+        document.addEventListener('DOMContentLoaded', () => {
+            cargarConfig();
+            cargarCitas();
+            
+            // Actualizar cada minuto
+            setInterval(() => {
+                cargarCitas();
+            }, 60000);
+        });
     </script>
 </body>
 </html>
