@@ -1,0 +1,44 @@
+{
+  "salon": {
+    "nombre": "Salon María",
+    "telefono": "+34 666 123 456",
+    "direccion": "Calle Principal 123, Barcelona"
+  },
+  "horario": {
+    "apertura": "09:00",
+    "cierre": "20:00",
+    "diasLaborables": [1, 2, 3, 4, 5, 6]
+  },
+  "peluqueros": [
+    {
+      "nombre": "María García",
+      "especialidad": "Corte y Color"
+    },
+    {
+      "nombre": "Ana López", 
+      "especialidad": "Peinados"
+    }
+  ],
+  "servicios": [
+    {
+      "nombre": "Corte de Cabello",
+      "precio": 25,
+      "duracion": 30
+    },
+    {
+      "nombre": "Tinte/Color",
+      "precio": 45,
+      "duracion": 90
+    },
+    {
+      "nombre": "Peinado",
+      "precio": 30,
+      "duracion": 45
+    }
+  ],
+  "whatsapp": {
+    "accessToken": "TU_TOKEN_AQUI",
+    "phoneNumberId": "TU_ID_AQUI",
+    "verifyToken": "mi_token_secreto_123"
+  }
+}

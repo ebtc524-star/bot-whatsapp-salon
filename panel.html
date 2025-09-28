@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel - Bot WhatsApp</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .header { background: #25D366; color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
+        .card { background: white; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .btn { background: #25D366; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        .btn:hover { background: #128C7E; }
+        input, select { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; }
+        .status { padding: 5px 10px; border-radius: 20px; font-size: 14px; font-weight: bold; }
+        .status.abierto { background: #d4edda; color: #155724; }
+        .status.cerrado { background: #f8d7da; color: #721c24; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Bot WhatsApp - Panel Control</h1>
+            <p>Estado actual: <span id="estado" class="status">Cargando...</span></p>
+        </div>
+
+        <div class="card">
+            <h2>📋 Citas Reservadas</h2>
+            <div id="citasLista">Cargando citas...</div>
+            <button class="btn" onclick="cargarCitas()">🔄 Actualizar</button>
+        </div>
+
+        <div class="card">
+            <h2>⚙️ Configuración Rápida</h2>
+            <div>
+                <label>Nombre del Salón:</label>
+                <input type="text" id="salonNombre" placeholder="Salon María">
+            </div>
+            <div>
+                <label>Horario de Apertura:</label>
+                <input type="time" id="horarioApertura" value="09:00">
+            </div>
+            <div>
+                <label>Horario de Cierre:</label>
+                <input type="time" id="horarioCierre" value="20:00">
+            </div>
+            <button class="btn" onclick="guardarConfig()">💾 Guardar</button>
+        </div>
+
+        <div class="card">
+            <h2>🔗 Configuración WhatsApp</h2>
+            <p><strong>URL del Webhook:</strong></p>
+            <p id="webhookUrl" style="background: #f8f9fa; padding: 10px; border-radius: 5px; word-break: break-all;">
+                Cargando URL...
+            </p>
+            <p><small>Copia esta URL y úsala en la configuración de WhatsApp Business API</small></p>
+        </div>
+    </div>
+
+    <script>
+        let config = {};
+
+        async function cargarTodo() {
+            await cargarConfig();
+            await cargarCitas();
+            actualizarEstado();
+            mostrarWebhookUrl();
+        }
+
+        async function cargarConfig() {
+            try {
+                const response = await fetch('/api/config');
+                config = await response.json();
+                
+                document.getElementById('salonNombre').value = config.salon.nombre;
+                document.getElementById('horarioApertura').value = config.horario.apertura;
+                document.getElementById('horarioCierre').value = config.horario.cierre;
+            } catch (error) {
+                console.error('Error cargando config:', error);
+            }
+        }
+
+        async function cargarCitas() {
+            try {
+                const response = await fetch('/api/citas');
+                const citas = await response.json();
+                
+                const lista = document.getElementById('citasLista');
+                if (citas.length === 0) {
+                    lista.innerHTML = '<p>No hay citas reservadas</p>';
+                } else {
+                    lista.innerHTML = `
+                        <table>
+                            <tr><th>Fecha</th><th>Servicio</th><th>Peluquero</th><th>Precio</th></tr>
+                            ${citas.map(c => `
+                                <tr>
+                                    <td>${c.fecha}</td>
+                                    <td>${c.servicio}</td>
+                                    <td>${c.peluquero}</td>
+                                    <td>${c.precio}€</td>
+                                </tr>
+                            `).join('')}
+                        </table>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error cargando citas:', error);
+            }
+        }
+
+        function actualizarEstado() {
+            const ahora = new Date();
+            const hora = ahora.getHours();
+            const dia = ahora.getDay();
+            
+            const apertura = parseInt(config.horario.apertura.split(':')[0]);
+            const cierre = parseInt(config.horario.cierre.split(':')[0]);
+            
+            const abierto = config.horario.diasLaborables.includes(dia) && hora >= apertura && hora <= cierre;
+            
+            const estadoEl = document.getElementById('estado');
+            estadoEl.textContent = abierto ? 'ABIERTO' : 'CERRADO';
+            estadoEl.className = 'status ' + (abierto ? 'abierto' : 'cerrado');
+        }
+
+        function mostrarWebhookUrl() {
+            const url = window.location.origin + '/webhook';
+            document.getElementById('webhookUrl').textContent = url;
+        }
+
+        async function guardarConfig() {
+            config.salon.nombre = document.getElementById('salonNombre').value;
+            config.horario.apertura = document.getElementById('horarioApertura').value;
+            config.horario.cierre = document.getElementById('horarioCierre').value;
+            
+            try {
+                await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                alert('✅ Configuración guardada');
+                actualizarEstado();
+            } catch (error) {
+                alert('❌ Error guardando configuración');
+            }
+        }
+
+        // Cargar todo al inicio
+        cargarTodo();
+        
+        // Actualizar cada minuto
+        setInterval(actualizarEstado, 60000);
+    </script>
+</body>
+</html>
