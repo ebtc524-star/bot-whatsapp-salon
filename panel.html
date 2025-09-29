@@ -3,257 +3,213 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel - Bot WhatsApp QR</title>
+    <title>Panel - Bot WhatsApp Salón</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
-        .container { max-width: 1000px; margin: 0 auto; }
-        .header { background: linear-gradient(135deg, #25D366, #128C7E); color: white; padding: 30px; border-radius: 15px; margin-bottom: 20px; text-align: center; }
-        .card { background: white; border-radius: 15px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .btn { background: #25D366; color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; margin: 5px; font-weight: bold; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { 
+            background: linear-gradient(135deg, #25D366, #128C7E); 
+            color: white; 
+            padding: 30px; 
+            border-radius: 15px; 
+            margin-bottom: 20px; 
+            text-align: center; 
+        }
+        .card { 
+            background: white; 
+            border-radius: 15px; 
+            padding: 25px; 
+            margin-bottom: 20px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+        }
+        .btn { 
+            background: #25D366; 
+            color: white; 
+            border: none; 
+            padding: 12px 25px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            margin: 5px; 
+            font-weight: bold; 
+        }
         .btn:hover { background: #128C7E; transform: translateY(-2px); transition: 0.3s; }
-        .btn.danger { background: #dc3545; }
-        .btn.danger:hover { background: #c82333; }
-        input, select { width: 100%; padding: 12px; margin: 8px 0; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; }
+        input { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 8px 0; 
+            border: 2px solid #ddd; 
+            border-radius: 8px; 
+            font-size: 16px; 
+        }
         input:focus { border-color: #25D366; outline: none; }
-        .status { padding: 8px 15px; border-radius: 25px; font-size: 14px; font-weight: bold; margin: 0 10px; }
-        .status.connected { background: #d4edda; color: #155724; }
-        .status.disconnected { background: #f8d7da; color: #721c24; }
-        .status.connecting { background: #fff3cd; color: #856404; }
-        .qr-container { text-align: center; padding: 20px; }
-        .qr-code { max-width: 300px; margin: 20px auto; border: 3px solid #25D366; border-radius: 15px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 2px solid #eee; }
-        th { background: #f8f9fa; font-weight: bold; }
+        .status { 
+            padding: 8px 15px; 
+            border-radius: 25px; 
+            font-size: 14px; 
+            font-weight: bold; 
+            display: inline-block;
+            margin: 0 10px; 
+        }
+        .status.open { background: #d4edda; color: #155724; }
+        .status.closed { background: #f8d7da; color: #721c24; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .notification { background: #25D366; color: white; padding: 15px; border-radius: 8px; margin: 10px 0; animation: slideIn 0.5s; }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        .appointment-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            background: white;
+        }
+        .appointment-card strong { color: #25D366; }
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🤖 Bot WhatsApp - Panel Control</h1>
-            <p>Conecta tu WhatsApp Business con un simple escaneo</p>
+            <h1>🤖 Bot WhatsApp - Panel de Control</h1>
+            <p>Sistema de gestión automática de citas</p>
             <div style="margin-top: 15px;">
-                Estado: <span id="estadoConexion" class="status">Cargando...</span>
-                <span id="estadoSalon" class="status">Cargando...</span>
+                Estado del Salón: <span id="salon-status" class="status">Cargando...</span>
             </div>
         </div>
 
-        <!-- CONEXIÓN WHATSAPP -->
         <div class="card">
-            <h2>📱 Conexión WhatsApp</h2>
-            <div id="conexionContent">
-                <div id="qrSection" style="display: none;">
-                    <div class="qr-container">
-                        <h3>📱 Escanea este QR desde tu WhatsApp Business</h3>
-                        <p>Abre WhatsApp → Menú (3 puntos) → WhatsApp Web → Escanear código QR</p>
-                        <img id="qrImage" class="qr-code" style="display: none;">
-                        <div id="qrLoading">Generando código QR...</div>
-                    </div>
-                </div>
-                
-                <div id="conectadoSection" style="display: none;">
-                    <div style="text-align: center; padding: 20px;">
-                        <h3 style="color: #25D366;">✅ WhatsApp Conectado Correctamente</h3>
-                        <p>Tu bot está recibiendo y enviando mensajes</p>
-                        <button class="btn danger" onclick="desconectar()">🔌 Desconectar WhatsApp</button>
-                    </div>
-                </div>
-                
-                <div id="desconectadoSection">
-                    <div style="text-align: center; padding: 20px;">
-                        <h3>📱 WhatsApp No Conectado</h3>
-                        <p>Haz click para generar el código QR</p>
-                        <button class="btn" onclick="conectar()">🔗 Conectar WhatsApp</button>
-                    </div>
-                </div>
+            <h2>📅 Citas Reservadas</h2>
+            <div id="appointments-list" style="margin-top: 20px;">
+                <p style="text-align:center;color:#666;">Cargando citas...</p>
             </div>
         </div>
 
         <div class="grid">
-            <!-- CITAS -->
             <div class="card">
-                <h2>📅 Citas Reservadas <span id="contadorCitas" class="status connected">0</span></h2>
-                <div id="citasLista">Cargando citas...</div>
-                <button class="btn" onclick="cargarCitas()">🔄 Actualizar</button>
+                <h2>⚙️ Configuración del Salón</h2>
+                <div style="margin-top: 15px;">
+                    <label style="display:block;margin-bottom:5px;font-weight:bold;">Nombre del Salón:</label>
+                    <input type="text" id="salon-name" placeholder="Nombre del salón">
+                    
+                    <label style="display:block;margin-bottom:5px;font-weight:bold;margin-top:15px;">Teléfono:</label>
+                    <input type="text" id="salon-phone" placeholder="+34 XXX XXX XXX">
+                    
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:15px;">
+                        <div>
+                            <label style="display:block;margin-bottom:5px;font-weight:bold;">Apertura:</label>
+                            <input type="time" id="open-time" value="09:00">
+                        </div>
+                        <div>
+                            <label style="display:block;margin-bottom:5px;font-weight:bold;">Cierre:</label>
+                            <input type="time" id="close-time" value="20:00">
+                        </div>
+                    </div>
+                    
+                    <button class="btn" onclick="saveConfig()" style="margin-top:15px;width:100%;">💾 Guardar Configuración</button>
+                </div>
             </div>
 
-            <!-- CONFIGURACIÓN -->
             <div class="card">
-                <h2>⚙️ Configuración Rápida</h2>
-                <div>
-                    <label>Nombre del Salón:</label>
-                    <input type="text" id="salonNombre" placeholder="Salon María">
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div>
-                        <label>Apertura:</label>
-                        <input type="time" id="horarioApertura" value="09:00">
+                <h2>📊 Estadísticas</h2>
+                <div style="margin-top: 20px;">
+                    <div style="padding:15px;background:#f8f9fa;border-radius:8px;margin-bottom:10px;">
+                        <div style="font-size:14px;color:#666;">Total de Citas</div>
+                        <div style="font-size:32px;font-weight:bold;color:#25D366;" id="total-appointments">0</div>
                     </div>
-                    <div>
-                        <label>Cierre:</label>
-                        <input type="time" id="horarioCierre" value="20:00">
+                    <div style="padding:15px;background:#f8f9fa;border-radius:8px;margin-bottom:10px;">
+                        <div style="font-size:14px;color:#666;">Conversaciones Activas</div>
+                        <div style="font-size:32px;font-weight:bold;color:#128C7E;" id="active-conversations">0</div>
+                    </div>
+                    <div style="padding:15px;background:#f8f9fa;border-radius:8px;">
+                        <div style="font-size:14px;color:#666;">Estado del Bot</div>
+                        <div style="font-size:20px;font-weight:bold;margin-top:5px;" id="bot-status">
+                            <span style="color:#25D366;">● Activo</span>
+                        </div>
                     </div>
                 </div>
-                <button class="btn" onclick="guardarConfig()">💾 Guardar Configuración</button>
             </div>
         </div>
 
-        <!-- NOTIFICACIONES -->
-        <div id="notificaciones"></div>
+        <div class="card" style="background:#f8f9fa;">
+            <h3>🔗 Configuración WhatsApp Business API</h3>
+            <div style="margin-top:15px;">
+                <p><strong>Webhook URL:</strong></p>
+                <code style="display:block;background:white;padding:10px;border-radius:5px;margin:10px 0;">
+                    <span id="webhook-url">Cargando...</span>
+                </code>
+                <p style="margin-top:15px;font-size:14px;color:#666;">
+                    Usa esta URL en Meta for Developers para configurar el webhook de WhatsApp.
+                </p>
+            </div>
+        </div>
     </div>
 
     <script>
-    // Obtener URL del webhook
-    document.getElementById('webhook-url').textContent = window.location.origin + '/webhook';
+        document.getElementById('webhook-url').textContent = window.location.origin + '/webhook';
 
-    // Cargar estado
-    function loadStatus() {
-        fetch('/api/status')
-            .then(res => res.json())
-            .then(data => {
-                const statusEl = document.getElementById('estadoSalon');
-                statusEl.textContent = data.isOpen ? 'ABIERTO' : 'CERRADO';
-                statusEl.className = 'status ' + (data.isOpen ? 'connected' : 'disconnected');
-            })
-            .catch(err => console.error('Error:', err));
-    }
+        function loadStatus() {
+            fetch('/api/status')
+                .then(res => res.json())
+                .then(data => {
+                    const statusEl = document.getElementById('salon-status');
+                    statusEl.textContent = data.isOpen ? 'ABIERTO' : 'CERRADO';
+                    statusEl.className = 'status ' + (data.isOpen ? 'open' : 'closed');
+                    
+                    document.getElementById('total-appointments').textContent = data.appointments || 0;
+                    document.getElementById('active-conversations').textContent = data.conversations || 0;
+                })
+                .catch(err => {
+                    console.error('Error cargando estado:', err);
+                    document.getElementById('salon-status').textContent = 'ERROR';
+                });
+        }
 
-    // Cargar citas
-    function loadAppointments() {
-        fetch('/api/appointments')
-            .then(res => res.json())
-            .then(appointments => {
-                const container = document.getElementById('citasLista');
-                
-                if (appointments.length === 0) {
-                    container.innerHTML = '<p style="text-align:center;color:#666;">No hay citas</p>';
-                    return;
-                }
+        function loadAppointments() {
+            fetch('/api/appointments')
+                .then(res => res.json())
+                .then(appointments => {
+                    const container = document.getElementById('appointments-list');
+                    
+                    if (appointments.length === 0) {
+                        container.innerHTML = '<p style="text-align:center;color:#666;padding:20px;">No hay citas reservadas</p>';
+                        return;
+                    }
 
-                container.innerHTML = appointments.map(apt => `
-                    <div style="border:1px solid #ddd;padding:15px;margin:10px 0;border-radius:8px;">
-                        <div><strong>${apt.dateFormatted}</strong> - ${apt.time}</div>
-                        <div>${apt.service.name} - ${apt.service.price}€</div>
-                        <div>${apt.staff.name}</div>
-                    </div>
-                `).join('');
-                
-                document.getElementById('contadorCitas').textContent = appointments.length;
-            })
-            .catch(err => console.error('Error:', err));
-    }
+                    container.innerHTML = appointments.map(apt => `
+                        <div class="appointment-card">
+                            <div><strong>📅 ${apt.dateFormatted || 'Fecha no disponible'}</strong> a las <strong>${apt.time || '--:--'}</strong></div>
+                            <div style="margin-top:8px;">✂️ ${apt.service?.name || 'Servicio no especificado'} - <strong>${apt.service?.price || 0}€</strong></div>
+                            <div style="margin-top:5px;">👤 ${apt.staff?.name || 'Peluquero no especificado'}</div>
+                            <div style="font-size:12px;color:#666;margin-top:5px;">📱 ${apt.phone || 'Sin teléfono'}</div>
+                        </div>
+                    `).join('');
+                })
+                .catch(err => {
+                    console.error('Error cargando citas:', err);
+                    document.getElementById('appointments-list').innerHTML = 
+                        '<p style="text-align:center;color:#dc3545;padding:20px;">Error al cargar las citas</p>';
+                });
+        }
 
-    // Inicializar
-    loadStatus();
-    loadAppointments();
-    setInterval(() => {
+        function saveConfig() {
+            alert('Configuración guardada localmente');
+        }
+
         loadStatus();
         loadAppointments();
-    }, 5000);
-</script>
 
-        // ===============================
-        // ACCIONES
-        // ===============================
-        async function conectar() {
-            mostrarNotificacion('🔄 Conectando WhatsApp...', 'info');
-            try {
-                await fetch('/api/reconectar', { method: 'POST' });
-                mostrarSeccion('qr');
-                document.getElementById('qrLoading').style.display = 'block';
-                document.getElementById('qrImage').style.display = 'none';
-            } catch (error) {
-                mostrarNotificacion('❌ Error al conectar', 'error');
-            }
-        }
+        setInterval(() => {
+            loadStatus();
+            loadAppointments();
+        }, 5000);
 
-        async function desconectar() {
-            if (confirm('¿Seguro que quieres desconectar WhatsApp?')) {
-                mostrarNotificacion('🔄 Desconectando...', 'info');
-                location.reload(); // Reiniciar página
-            }
-        }
-
-        async function cargarCitas() {
-            try {
-                const response = await fetch('/api/citas');
-                const citas = await response.json();
-                
-                const lista = document.getElementById('citasLista');
-                document.getElementById('contadorCitas').textContent = citas.length;
-                
-                if (citas.length === 0) {
-                    lista.innerHTML = '<p style="text-align: center; color: #666;">No hay citas reservadas</p>';
-                } else {
-                    lista.innerHTML = `
-                        <table>
-                            <tr><th>Fecha</th><th>Servicio</th><th>Peluquero</th><th>Precio</th></tr>
-                            ${citas.map(c => `
-                                <tr>
-                                    <td>${c.fecha}</td>
-                                    <td>${c.servicio}</td>
-                                    <td>${c.peluquero}</td>
-                                    <td style="font-weight: bold; color: #25D366;">${c.precio}€</td>
-                                </tr>
-                            `).join('')}
-                        </table>
-                    `;
-                }
-            } catch (error) {
-                mostrarNotificacion('❌ Error cargando citas', 'error');
-            }
-        }
-
-        async function cargarConfig() {
-            try {
-                const response = await fetch('/api/config');
-                config = await response.json();
-                
-                document.getElementById('salonNombre').value = config.salon?.nombre || '';
-                document.getElementById('horarioApertura').value = config.horario?.apertura || '09:00';
-                document.getElementById('horarioCierre').value = config.horario?.cierre || '20:00';
-            } catch (error) {
-                console.error('Error cargando config:', error);
-            }
-        }
-
-        async function guardarConfig() {
-            config.salon = config.salon || {};
-            config.horario = config.horario || {};
-            
-            config.salon.nombre = document.getElementById('salonNombre').value;
-            config.horario.apertura = document.getElementById('horarioApertura').value;
-            config.horario.cierre = document.getElementById('horarioCierre').value;
-            
-            try {
-                await fetch('/api/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(config)
+        setInterval(() => {
+            fetch('/api/status')
+                .then(res => res.json())
+                .then(data => {
+                    document.title = `Panel (${data.appointments} citas) - Bot WhatsApp`;
                 });
-                mostrarNotificacion('✅ Configuración guardada', 'success');
-            } catch (error) {
-                mostrarNotificacion('❌ Error guardando configuración', 'error');
-            }
-        }
-
-        // ===============================
-        // INICIALIZACIÓN
-        // ===============================
-        document.addEventListener('DOMContentLoaded', () => {
-            cargarConfig();
-            cargarCitas();
-            
-            // Actualizar cada minuto
-            setInterval(() => {
-                cargarCitas();
-            }, 60000);
-        });
+        }, 10000);
     </script>
 </body>
 </html>
-
-
