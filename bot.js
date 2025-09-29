@@ -5,8 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Cargar configuración
-const config = require('./config.json');
-
+const config = require('./src/config.json');
 const app = express();
 app.use(bodyParser.json());
 app.use(express.static('.'));
@@ -318,7 +317,7 @@ app.get('/api/status', (req, res) => {
 
 // Servir panel
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'panel.html'));
+    res.sendFile(path.join(__dirname, 'src/panel.html'));
 });
 
 // Iniciar servidor
@@ -328,3 +327,4 @@ app.listen(PORT, () => {
     console.log(`📱 Webhook: /webhook`);
     console.log(`🌐 Panel: http://localhost:${PORT}`);
 });
+
