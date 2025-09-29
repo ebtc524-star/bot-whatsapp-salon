@@ -3,213 +3,826 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel - Bot WhatsApp Salón</title>
+    <title>Panel Administración - Bot WhatsApp</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .header { 
-            background: linear-gradient(135deg, #25D366, #128C7E); 
-            color: white; 
-            padding: 30px; 
-            border-radius: 15px; 
-            margin-bottom: 20px; 
-            text-align: center; 
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; }
+        
+        .header {
+            background: linear-gradient(135deg, #25D366, #128C7E);
+            color: white;
+            padding: 20px 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        .card { 
-            background: white; 
-            border-radius: 15px; 
-            padding: 25px; 
-            margin-bottom: 20px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
-        }
-        .btn { 
-            background: #25D366; 
-            color: white; 
-            border: none; 
-            padding: 12px 25px; 
-            border-radius: 8px; 
-            cursor: pointer; 
-            margin: 5px; 
-            font-weight: bold; 
-        }
-        .btn:hover { background: #128C7E; transform: translateY(-2px); transition: 0.3s; }
-        input { 
-            width: 100%; 
-            padding: 12px; 
-            margin: 8px 0; 
-            border: 2px solid #ddd; 
-            border-radius: 8px; 
-            font-size: 16px; 
-        }
-        input:focus { border-color: #25D366; outline: none; }
-        .status { 
-            padding: 8px 15px; 
-            border-radius: 25px; 
-            font-size: 14px; 
-            font-weight: bold; 
-            display: inline-block;
-            margin: 0 10px; 
-        }
-        .status.open { background: #d4edda; color: #155724; }
-        .status.closed { background: #f8d7da; color: #721c24; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .appointment-card {
-            border: 1px solid #ddd;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 8px;
+        
+        .header h1 { font-size: 24px; margin-bottom: 5px; }
+        .header p { opacity: 0.9; font-size: 14px; }
+        
+        .status-bar {
             background: white;
+            padding: 15px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e0e0e0;
         }
-        .appointment-card strong { color: #25D366; }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        
+        .status-badge.open { background: #d4edda; color: #155724; }
+        .status-badge.closed { background: #f8d7da; color: #721c24; }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            background: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        .tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 500;
+            color: #666;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        
+        .tab:hover { background: #f5f5f5; }
+        .tab.active { background: #25D366; color: white; }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .card h2 {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #25D366;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #25D366;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #128C7E;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+        
+        .list-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+        }
+        
+        .list-item:hover {
+            border-color: #25D366;
+            background: #f0fff4;
+        }
+        
+        .list-item-info {
+            flex: 1;
+        }
+        
+        .list-item-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .list-item-subtitle {
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .list-item-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .calendar {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .calendar-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+        
+        .appointment-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .appointment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+        
+        .appointment-date {
+            font-size: 24px;
+            font-weight: 700;
+        }
+        
+        .appointment-time {
+            background: rgba(255,255,255,0.2);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        
+        .appointment-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .appointment-detail {
+            font-size: 14px;
+        }
+        
+        .appointment-detail-label {
+            opacity: 0.8;
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+        
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border-left: 4px solid #28a745;
+        }
+        
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            color: #25D366;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        
         @media (max-width: 768px) {
-            .grid { grid-template-columns: 1fr; }
+            .form-row { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .appointment-details { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
+    <div class="header">
+        <h1>Panel de Administración</h1>
+        <p>Gestiona tu bot de WhatsApp y las citas de tu salón</p>
+    </div>
+    
+    <div class="status-bar">
+        <div class="status-item">
+            <span>Estado del Salón:</span>
+            <span id="salon-status" class="status-badge">Cargando...</span>
+        </div>
+        <div class="status-item">
+            <span>Citas Hoy:</span>
+            <strong id="today-appointments">0</strong>
+        </div>
+        <div class="status-item">
+            <span>Total Citas:</span>
+            <strong id="total-appointments">0</strong>
+        </div>
+    </div>
+    
     <div class="container">
-        <div class="header">
-            <h1>🤖 Bot WhatsApp - Panel de Control</h1>
-            <p>Sistema de gestión automática de citas</p>
-            <div style="margin-top: 15px;">
-                Estado del Salón: <span id="salon-status" class="status">Cargando...</span>
+        <div id="alert-container"></div>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('dashboard')">📊 Dashboard</button>
+            <button class="tab" onclick="showTab('config')">⚙️ Configuración</button>
+            <button class="tab" onclick="showTab('staff')">👥 Peluqueros</button>
+            <button class="tab" onclick="showTab('services')">✂️ Servicios</button>
+            <button class="tab" onclick="showTab('appointments')">📅 Calendario</button>
+        </div>
+        
+        <!-- DASHBOARD -->
+        <div id="tab-dashboard" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Citas Hoy</div>
+                    <div class="stat-value" id="stat-today">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Esta Semana</div>
+                    <div class="stat-value" id="stat-week">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total</div>
+                    <div class="stat-value" id="stat-total">0</div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>📅 Próximas Citas</h2>
+                <div id="upcoming-appointments"></div>
             </div>
         </div>
-
-        <div class="card">
-            <h2>📅 Citas Reservadas</h2>
-            <div id="appointments-list" style="margin-top: 20px;">
-                <p style="text-align:center;color:#666;">Cargando citas...</p>
-            </div>
-        </div>
-
-        <div class="grid">
+        
+        <!-- CONFIGURACIÓN -->
+        <div id="tab-config" class="tab-content">
             <div class="card">
                 <h2>⚙️ Configuración del Salón</h2>
-                <div style="margin-top: 15px;">
-                    <label style="display:block;margin-bottom:5px;font-weight:bold;">Nombre del Salón:</label>
-                    <input type="text" id="salon-name" placeholder="Nombre del salón">
-                    
-                    <label style="display:block;margin-bottom:5px;font-weight:bold;margin-top:15px;">Teléfono:</label>
-                    <input type="text" id="salon-phone" placeholder="+34 XXX XXX XXX">
-                    
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:15px;">
-                        <div>
-                            <label style="display:block;margin-bottom:5px;font-weight:bold;">Apertura:</label>
-                            <input type="time" id="open-time" value="09:00">
-                        </div>
-                        <div>
-                            <label style="display:block;margin-bottom:5px;font-weight:bold;">Cierre:</label>
-                            <input type="time" id="close-time" value="20:00">
-                        </div>
+                <form id="form-salon">
+                    <div class="form-group">
+                        <label>Nombre del Salón</label>
+                        <input type="text" id="salon-name" required>
                     </div>
                     
-                    <button class="btn" onclick="saveConfig()" style="margin-top:15px;width:100%;">💾 Guardar Configuración</button>
-                </div>
-            </div>
-
-            <div class="card">
-                <h2>📊 Estadísticas</h2>
-                <div style="margin-top: 20px;">
-                    <div style="padding:15px;background:#f8f9fa;border-radius:8px;margin-bottom:10px;">
-                        <div style="font-size:14px;color:#666;">Total de Citas</div>
-                        <div style="font-size:32px;font-weight:bold;color:#25D366;" id="total-appointments">0</div>
-                    </div>
-                    <div style="padding:15px;background:#f8f9fa;border-radius:8px;margin-bottom:10px;">
-                        <div style="font-size:14px;color:#666;">Conversaciones Activas</div>
-                        <div style="font-size:32px;font-weight:bold;color:#128C7E;" id="active-conversations">0</div>
-                    </div>
-                    <div style="padding:15px;background:#f8f9fa;border-radius:8px;">
-                        <div style="font-size:14px;color:#666;">Estado del Bot</div>
-                        <div style="font-size:20px;font-weight:bold;margin-top:5px;" id="bot-status">
-                            <span style="color:#25D366;">● Activo</span>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Teléfono</label>
+                            <input type="text" id="salon-phone" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="salon-email">
                         </div>
                     </div>
-                </div>
+                    
+                    <div class="form-group">
+                        <label>Dirección</label>
+                        <input type="text" id="salon-address">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Hora de Apertura</label>
+                            <input type="time" id="salon-open" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Hora de Cierre</label>
+                            <input type="time" id="salon-close" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Días Laborables</label>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <label><input type="checkbox" value="1" class="working-day"> Lunes</label>
+                            <label><input type="checkbox" value="2" class="working-day"> Martes</label>
+                            <label><input type="checkbox" value="3" class="working-day"> Miércoles</label>
+                            <label><input type="checkbox" value="4" class="working-day"> Jueves</label>
+                            <label><input type="checkbox" value="5" class="working-day"> Viernes</label>
+                            <label><input type="checkbox" value="6" class="working-day"> Sábado</label>
+                            <label><input type="checkbox" value="0" class="working-day"> Domingo</label>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Guardar Configuración</button>
+                </form>
             </div>
         </div>
-
-        <div class="card" style="background:#f8f9fa;">
-            <h3>🔗 Configuración WhatsApp Business API</h3>
-            <div style="margin-top:15px;">
-                <p><strong>Webhook URL:</strong></p>
-                <code style="display:block;background:white;padding:10px;border-radius:5px;margin:10px 0;">
-                    <span id="webhook-url">Cargando...</span>
-                </code>
-                <p style="margin-top:15px;font-size:14px;color:#666;">
-                    Usa esta URL en Meta for Developers para configurar el webhook de WhatsApp.
-                </p>
+        
+        <!-- PELUQUEROS -->
+        <div id="tab-staff" class="tab-content">
+            <div class="card">
+                <h2>👥 Gestionar Peluqueros</h2>
+                <div id="staff-list"></div>
+                
+                <hr style="margin: 30px 0; border: none; border-top: 2px solid #e0e0e0;">
+                
+                <h3 style="margin-bottom: 20px;">Agregar Nuevo Peluquero</h3>
+                <form id="form-staff">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Nombre</label>
+                            <input type="text" id="staff-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Especialidad</label>
+                            <input type="text" id="staff-specialty" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Años de Experiencia</label>
+                        <input type="text" id="staff-experience">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Agregar Peluquero</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- SERVICIOS -->
+        <div id="tab-services" class="tab-content">
+            <div class="card">
+                <h2>✂️ Gestionar Servicios</h2>
+                <div id="services-list"></div>
+                
+                <hr style="margin: 30px 0; border: none; border-top: 2px solid #e0e0e0;">
+                
+                <h3 style="margin-bottom: 20px;">Agregar Nuevo Servicio</h3>
+                <form id="form-service">
+                    <div class="form-group">
+                        <label>Nombre del Servicio</label>
+                        <input type="text" id="service-name" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Precio (€)</label>
+                            <input type="number" id="service-price" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Duración (minutos)</label>
+                            <input type="number" id="service-duration" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Descripción</label>
+                        <textarea id="service-description" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Agregar Servicio</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- CALENDARIO -->
+        <div id="tab-appointments" class="tab-content">
+            <div class="card">
+                <div class="calendar-header">
+                    <h2 class="calendar-title">📅 Calendario de Citas</h2>
+                    <button class="btn btn-primary btn-small" onclick="loadAppointments()">🔄 Actualizar</button>
+                </div>
+                <div id="appointments-calendar"></div>
             </div>
         </div>
     </div>
-
+    
     <script>
-        document.getElementById('webhook-url').textContent = window.location.origin + '/webhook';
-
-        function loadStatus() {
-            fetch('/api/status')
-                .then(res => res.json())
-                .then(data => {
-                    const statusEl = document.getElementById('salon-status');
-                    statusEl.textContent = data.isOpen ? 'ABIERTO' : 'CERRADO';
-                    statusEl.className = 'status ' + (data.isOpen ? 'open' : 'closed');
-                    
-                    document.getElementById('total-appointments').textContent = data.appointments || 0;
-                    document.getElementById('active-conversations').textContent = data.conversations || 0;
-                })
-                .catch(err => {
-                    console.error('Error cargando estado:', err);
-                    document.getElementById('salon-status').textContent = 'ERROR';
-                });
+        let config = {};
+        
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById('tab-' + tabName).classList.add('active');
+            
+            if (tabName === 'appointments') loadAppointments();
         }
-
-        function loadAppointments() {
-            fetch('/api/appointments')
-                .then(res => res.json())
-                .then(appointments => {
-                    const container = document.getElementById('appointments-list');
-                    
-                    if (appointments.length === 0) {
-                        container.innerHTML = '<p style="text-align:center;color:#666;padding:20px;">No hay citas reservadas</p>';
-                        return;
-                    }
-
-                    container.innerHTML = appointments.map(apt => `
-                        <div class="appointment-card">
-                            <div><strong>📅 ${apt.dateFormatted || 'Fecha no disponible'}</strong> a las <strong>${apt.time || '--:--'}</strong></div>
-                            <div style="margin-top:8px;">✂️ ${apt.service?.name || 'Servicio no especificado'} - <strong>${apt.service?.price || 0}€</strong></div>
-                            <div style="margin-top:5px;">👤 ${apt.staff?.name || 'Peluquero no especificado'}</div>
-                            <div style="font-size:12px;color:#666;margin-top:5px;">📱 ${apt.phone || 'Sin teléfono'}</div>
+        
+        function showAlert(message, type = 'success') {
+            const container = document.getElementById('alert-container');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.innerHTML = `<strong>${type === 'success' ? '✓' : '✗'}</strong> ${message}`;
+            container.appendChild(alert);
+            setTimeout(() => alert.remove(), 5000);
+        }
+        
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                config = await res.json();
+                
+                document.getElementById('salon-name').value = config.salon?.name || '';
+                document.getElementById('salon-phone').value = config.salon?.phone || '';
+                document.getElementById('salon-email').value = config.salon?.email || '';
+                document.getElementById('salon-address').value = config.salon?.address || '';
+                document.getElementById('salon-open').value = config.salon?.openTime || '09:00';
+                document.getElementById('salon-close').value = config.salon?.closeTime || '20:00';
+                
+                document.querySelectorAll('.working-day').forEach(cb => {
+                    cb.checked = config.salon?.workingDays?.includes(parseInt(cb.value)) || false;
+                });
+                
+                renderStaff();
+                renderServices();
+            } catch (error) {
+                showAlert('Error cargando configuración', 'error');
+            }
+        }
+        
+        async function loadStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                
+                const statusEl = document.getElementById('salon-status');
+                statusEl.textContent = data.isOpen ? 'ABIERTO' : 'CERRADO';
+                statusEl.className = 'status-badge ' + (data.isOpen ? 'open' : 'closed');
+                
+                document.getElementById('total-appointments').textContent = data.appointments || 0;
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        function renderStaff() {
+            const list = document.getElementById('staff-list');
+            if (!config.staff || config.staff.length === 0) {
+                list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">👤</div><p>No hay peluqueros registrados</p></div>';
+                return;
+            }
+            
+            list.innerHTML = config.staff.map((s, i) => `
+                <div class="list-item">
+                    <div class="list-item-info">
+                        <div class="list-item-title">${s.name}</div>
+                        <div class="list-item-subtitle">${s.specialty} ${s.experience ? '• ' + s.experience : ''}</div>
+                    </div>
+                    <div class="list-item-actions">
+                        <button class="btn btn-danger btn-small" onclick="deleteStaff(${i})">Eliminar</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function renderServices() {
+            const list = document.getElementById('services-list');
+            if (!config.services || config.services.length === 0) {
+                list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✂️</div><p>No hay servicios registrados</p></div>';
+                return;
+            }
+            
+            list.innerHTML = config.services.map((s, i) => `
+                <div class="list-item">
+                    <div class="list-item-info">
+                        <div class="list-item-title">${s.name}</div>
+                        <div class="list-item-subtitle">${s.price}€ • ${s.duration} min ${s.description ? '• ' + s.description : ''}</div>
+                    </div>
+                    <div class="list-item-actions">
+                        <button class="btn btn-danger btn-small" onclick="deleteService(${i})">Eliminar</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        async function loadAppointments() {
+            try {
+                const res = await fetch('/api/appointments');
+                const appointments = await res.json();
+                
+                const container = document.getElementById('appointments-calendar');
+                const upcoming = document.getElementById('upcoming-appointments');
+                
+                if (appointments.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📅</div><p>No hay citas reservadas</p></div>';
+                    upcoming.innerHTML = '<div class="empty-state"><p>No hay citas próximas</p></div>';
+                    return;
+                }
+                
+                const sorted = appointments.sort((a, b) => new Date(a.date) - new Date(b.date));
+                
+                container.innerHTML = sorted.map(apt => `
+                    <div class="appointment-card">
+                        <div class="appointment-header">
+                            <div class="appointment-date">${apt.dateFormatted}</div>
+                            <div class="appointment-time">${apt.time}</div>
                         </div>
-                    `).join('');
-                })
-                .catch(err => {
-                    console.error('Error cargando citas:', err);
-                    document.getElementById('appointments-list').innerHTML = 
-                        '<p style="text-align:center;color:#dc3545;padding:20px;">Error al cargar las citas</p>';
+                        <div class="appointment-details">
+                            <div class="appointment-detail">
+                                <div class="appointment-detail-label">Servicio</div>
+                                <div>${apt.service?.name}</div>
+                            </div>
+                            <div class="appointment-detail">
+                                <div class="appointment-detail-label">Peluquero</div>
+                                <div>${apt.staff?.name}</div>
+                            </div>
+                            <div class="appointment-detail">
+                                <div class="appointment-detail-label">Precio</div>
+                                <div>${apt.service?.price}€</div>
+                            </div>
+                            <div class="appointment-detail">
+                                <div class="appointment-detail-label">Cliente</div>
+                                <div>${apt.phone}</div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                upcoming.innerHTML = sorted.slice(0, 5).map(apt => `
+                    <div class="list-item">
+                        <div class="list-item-info">
+                            <div class="list-item-title">${apt.dateFormatted} - ${apt.time}</div>
+                            <div class="list-item-subtitle">${apt.service?.name} con ${apt.staff?.name}</div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                updateStats(appointments);
+            } catch (error) {
+                showAlert('Error cargando citas', 'error');
+            }
+        }
+        
+        function updateStats(appointments) {
+            const today = new Date().toLocaleDateString('es-ES');
+            const todayCount = appointments.filter(a => {
+                const aptDate = new Date(a.date).toLocaleDateString('es-ES');
+                return aptDate === today;
+            }).length;
+            
+            document.getElementById('stat-today').textContent = todayCount;
+            document.getElementById('today-appointments').textContent = todayCount;
+            document.getElementById('stat-total').textContent = appointments.length;
+        }
+        
+        document.getElementById('form-salon').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const workingDays = Array.from(document.querySelectorAll('.working-day:checked')).map(cb => parseInt(cb.value));
+            
+            try {
+                const res = await fetch('/api/config/salon', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: document.getElementById('salon-name').value,
+                        phone: document.getElementById('salon-phone').value,
+                        email: document.getElementById('salon-email').value,
+                        address: document.getElementById('salon-address').value,
+                        openTime: document.getElementById('salon-open').value,
+                        closeTime: document.getElementById('salon-close').value,
+                        workingDays
+                    })
                 });
+                
+                const data = await res.json();
+                showAlert(data.message);
+                loadConfig();
+            } catch (error) {
+                showAlert('Error guardando configuración', 'error');
+            }
+        });
+        
+        document.getElementById('form-staff').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            try {
+                const res = await fetch('/api/config/staff', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        staff: {
+                            name: document.getElementById('staff-name').value,
+                            specialty: document.getElementById('staff-specialty').value,
+                            experience: document.getElementById('staff-experience').value
+                        }
+                    })
+                });
+                
+                const data = await res.json();
+                if (data.success) {
+                    showAlert('Peluquero agregado correctamente');
+                    config.staff = data.staff;
+                    renderStaff();
+                    e.target.reset();
+                }
+            } catch (error) {
+                showAlert('Error agregando peluquero', 'error');
+            }
+        });
+        
+        document.getElementById('form-service').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            try {
+                const res = await fetch('/api/config/service', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        service: {
+                            name: document.getElementById('service-name').value,
+                            price: parseInt(document.getElementById('service-price').value),
+                            duration: parseInt(document.getElementById('service-duration').value),
+                            description: document.getElementById('service-description').value
+                        }
+                    })
+                });
+                
+                const data = await res.json();
+                if (data.success) {
+                    showAlert('Servicio agregado correctamente');
+                    config.services = data.services;
+                    renderServices();
+                    e.target.reset();
+                }
+            } catch (error) {
+                showAlert('Error agregando servicio', 'error');
+            }
+        });
+        
+        async function deleteStaff(index) {
+            if (!confirm('¿Eliminar este peluquero?')) return;
+            
+            try {
+                const res = await fetch(`/api/config/staff/${index}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) {
+                    showAlert('Peluquero eliminado');
+                    config.staff = data.staff;
+                    renderStaff();
+                }
+            } catch (error) {
+                showAlert('Error eliminando peluquero', 'error');
+            }
         }
-
-        function saveConfig() {
-            alert('Configuración guardada localmente');
+        
+        async function deleteService(index) {
+            if (!confirm('¿Eliminar este servicio?')) return;
+            
+            try {
+                const res = await fetch(`/api/config/service/${index}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) {
+                    showAlert('Servicio eliminado');
+                    config.services = data.services;
+                    renderServices();
+                }
+            } catch (error) {
+                showAlert('Error eliminando servicio', 'error');
+            }
         }
-
+        
+        loadConfig();
         loadStatus();
         loadAppointments();
-
-        setInterval(() => {
-            loadStatus();
-            loadAppointments();
-        }, 5000);
-
-        setInterval(() => {
-            fetch('/api/status')
-                .then(res => res.json())
-                .then(data => {
-                    document.title = `Panel (${data.appointments} citas) - Bot WhatsApp`;
-                });
-        }, 10000);
+        
+        setInterval(loadStatus, 10000);
+        setInterval(loadAppointments, 30000);
     </script>
 </body>
 </html>
