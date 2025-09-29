@@ -4,7 +4,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
-const config = require('./config.json');
+let config = require('./config.json');
 
 const app = express();
 app.use(bodyParser.json());
@@ -23,6 +23,10 @@ try {
 
 function saveAppointments() {
     fs.writeFileSync('appointments.json', JSON.stringify(appointments, null, 2));
+}
+
+function reloadConfig() {
+    config = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
 }
 
 // WEBHOOK VERIFICATION (GET)
@@ -113,7 +117,6 @@ function getGreeting() {
     return 'Buenas noches';
 }
 
-// Verificar si fecha/hora está en el pasado
 function isInPast(dateStr, timeStr) {
     const [day, month, year] = dateStr.split('/');
     const [hour, minute] = timeStr.split(':');
@@ -121,7 +124,6 @@ function isInPast(dateStr, timeStr) {
     return appointmentDate < new Date();
 }
 
-// Verificar si está dentro del horario laboral
 function isWithinWorkingHours(timeStr) {
     const [hour] = timeStr.split(':').map(Number);
     const openHour = parseInt(config.salon.openTime.split(':')[0]);
@@ -130,7 +132,6 @@ function isWithinWorkingHours(timeStr) {
     return hour >= openHour && hour < closeHour;
 }
 
-// Verificar si es día laboral
 function isWorkingDay(dateStr) {
     const [day, month, year] = dateStr.split('/');
     const date = new Date(year, month - 1, day);
@@ -139,10 +140,8 @@ function isWorkingDay(dateStr) {
     return config.salon.workingDays.includes(dayOfWeek);
 }
 
-// Verificar disponibilidad de horario
 function checkAvailability(staffName, date, time) {
     const conflict = appointments.find(apt => {
-        // Si el staff es "Indiferente", no verificar por peluquero
         if (staffName === 'Indiferente') {
             return apt.dateFormatted === date && apt.time === time;
         }
@@ -155,7 +154,6 @@ function checkAvailability(staffName, date, time) {
     return !conflict;
 }
 
-// Sugerir horarios alternativos
 function getSuggestedTimes(staffName, date) {
     const busyTimes = appointments
         .filter(apt => {
@@ -193,7 +191,6 @@ async function processMessage(from, text) {
     const conv = conversations[from];
     const isOpen = isOpenNow();
     
-    // PASO 0: Saludo inicial
     if (conv.step === 'initial') {
         const greeting = getGreeting();
         const salonStatus = isOpen ? '' : '\n\nAunque el salón está cerrado ahora, estoy aquí para ayudarte las 24 horas.';
@@ -206,7 +203,6 @@ async function processMessage(from, text) {
         return;
     }
     
-    // PASO 1: Confirmar si quiere reservar
     if (conv.step === 'confirm_booking') {
         if (lowerText.includes('si') || lowerText.includes('sí')) {
             let servicesText = 'Perfecto ¿Qué servicio te gustaría?\n\n';
@@ -226,7 +222,6 @@ async function processMessage(from, text) {
         return;
     }
     
-    // PASO 2: Seleccionar servicio
     if (conv.step === 'select_service') {
         const serviceIndex = parseInt(lowerText) - 1;
         
@@ -249,7 +244,6 @@ async function processMessage(from, text) {
         return;
     }
     
-    // PASO 3: Seleccionar peluquero
     if (conv.step === 'select_staff') {
         const staffIndex = parseInt(lowerText) - 1;
         
@@ -272,7 +266,6 @@ async function processMessage(from, text) {
         return;
     }
     
-    // PASO 4: Seleccionar fecha y hora CON VALIDACIONES
     if (conv.step === 'select_datetime') {
         const dateMatch = text.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/);
         
@@ -281,7 +274,6 @@ async function processMessage(from, text) {
             const dateFormatted = `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
             const timeFormatted = `${hour.padStart(2, '0')}:${minute}`;
             
-            // VALIDACIÓN 1: Verificar si está en el pasado
             if (isInPast(dateFormatted, timeFormatted)) {
                 await sendWhatsAppMessage(from, 
                     '❌ No puedo reservar citas en el pasado.\n\nPor favor, escribe una fecha futura:\n📅 DD/MM/YYYY HH:MM'
@@ -289,7 +281,6 @@ async function processMessage(from, text) {
                 return;
             }
             
-            // VALIDACIÓN 2: Verificar si es día laboral
             if (!isWorkingDay(dateFormatted)) {
                 await sendWhatsAppMessage(from, 
                     `❌ El salón no abre ese día.\n\nDías laborables: Lunes a Sábado\n\nPor favor, escribe otra fecha:\n📅 DD/MM/YYYY HH:MM`
@@ -297,7 +288,6 @@ async function processMessage(from, text) {
                 return;
             }
             
-            // VALIDACIÓN 3: Verificar si está dentro del horario laboral
             if (!isWithinWorkingHours(timeFormatted)) {
                 await sendWhatsAppMessage(from, 
                     `❌ Esa hora está fuera de nuestro horario.\n\nHorario: ${config.salon.openTime} - ${config.salon.closeTime}\n\nPor favor, escribe otra hora:\n📅 DD/MM/YYYY HH:MM`
@@ -305,7 +295,6 @@ async function processMessage(from, text) {
                 return;
             }
             
-            // VALIDACIÓN 4: Verificar disponibilidad
             const staffName = conv.data.staff.name;
             const isAvailable = checkAvailability(staffName, dateFormatted, timeFormatted);
             
@@ -324,13 +313,11 @@ async function processMessage(from, text) {
                 return;
             }
             
-            // TODO VALIDADO - Guardar fecha y hora
             const appointmentDate = new Date(year, month - 1, day, hour, minute);
             conv.data.date = appointmentDate.toISOString();
             conv.data.dateFormatted = dateFormatted;
             conv.data.time = timeFormatted;
             
-            // Mostrar confirmación
             const confirmText = `
 ✨ CONFIRMACIÓN DE CITA ✨
 
@@ -357,7 +344,6 @@ Responde:
         return;
     }
     
-    // PASO 5: Confirmar cita
     if (conv.step === 'confirm_appointment') {
         if (lowerText.includes('confirma')) {
             const appointment = {
@@ -393,6 +379,83 @@ Responde:
     );
     conv.step = 'confirm_booking';
 }
+
+// RUTAS API PARA PANEL DE ADMINISTRACIÓN
+
+app.post('/api/config/salon', (req, res) => {
+    try {
+        config.salon = { ...config.salon, ...req.body };
+        fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
+        reloadConfig();
+        res.json({ success: true, message: 'Configuración guardada' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+app.post('/api/config/staff', (req, res) => {
+    try {
+        const { index, staff } = req.body;
+        
+        if (index !== undefined && index >= 0) {
+            config.staff[index] = staff;
+        } else {
+            config.staff.push(staff);
+        }
+        
+        fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
+        reloadConfig();
+        res.json({ success: true, staff: config.staff });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+app.delete('/api/config/staff/:index', (req, res) => {
+    try {
+        const index = parseInt(req.params.index);
+        config.staff.splice(index, 1);
+        fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
+        reloadConfig();
+        res.json({ success: true, staff: config.staff });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+app.post('/api/config/service', (req, res) => {
+    try {
+        const { index, service } = req.body;
+        
+        if (index !== undefined && index >= 0) {
+            config.services[index] = service;
+        } else {
+            config.services.push(service);
+        }
+        
+        fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
+        reloadConfig();
+        res.json({ success: true, services: config.services });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+app.delete('/api/config/service/:index', (req, res) => {
+    try {
+        const index = parseInt(req.params.index);
+        config.services.splice(index, 1);
+        fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
+        reloadConfig();
+        res.json({ success: true, services: config.services });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+app.get('/api/config', (req, res) => {
+    res.json(config);
+});
 
 app.get('/api/appointments', (req, res) => {
     res.json(appointments);
