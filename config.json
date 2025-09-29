@@ -1,39 +1,48 @@
 {
   "salon": {
-    "nombre": "Salon María",
-    "telefono": "+34 666 123 456",
-    "direccion": "Calle Principal 123, Barcelona"
+    "name": "Salon María",
+    "phone": "+34 666 123 456",
+    "email": "info@salonmaria.com",
+    "address": "Calle Principal 123, Barcelona",
+    "openTime": "09:00",
+    "closeTime": "20:00",
+    "workingDays": [1, 2, 3, 4, 5, 6]
   },
-  "horario": {
-    "apertura": "09:00",
-    "cierre": "20:00",
-    "diasLaborables": [1, 2, 3, 4, 5, 6]
+  "whatsapp": {
+    "accessToken": "AQUI_TU_TOKEN_DE_META",
+    "phoneNumberId": "800780326455638",
+    "verifyToken": "salon_secreto_2024"
   },
-  "peluqueros": [
+  "staff": [
     {
-      "nombre": "María García",
-      "especialidad": "Corte y Color"
+      "name": "María García",
+      "specialty": "Corte y Color",
+      "experience": "5 años"
     },
     {
-      "nombre": "Ana López", 
-      "especialidad": "Peinados"
+      "name": "Ana López",
+      "specialty": "Peinados",
+      "experience": "3 años"
     }
   ],
-  "servicios": [
+  "services": [
     {
-      "nombre": "Corte de Cabello",
-      "precio": 25,
-      "duracion": 30
+      "name": "Corte de Cabello",
+      "price": 25,
+      "duration": 30,
+      "description": "Corte personalizado"
     },
     {
-      "nombre": "Tinte/Color",
-      "precio": 45,
-      "duracion": 90
+      "name": "Tinte/Color",
+      "price": 45,
+      "duration": 90,
+      "description": "Tinte completo con técnicas modernas"
     },
     {
-      "nombre": "Peinado",
-      "precio": 30,
-      "duracion": 45
+      "name": "Peinado",
+      "price": 30,
+      "duration": 45,
+      "description": "Peinado para cualquier ocasión"
     }
   ]
 }
