@@ -9,7 +9,7 @@
     "workingDays": [1, 2, 3, 4, 5, 6]
   },
   "whatsapp": {
-    "accessToken": "EAAPx9xDZCgasBPnezl4VsfXxEd29NUDwtYpi48HSZAu4eqbEprO0yE5UBR3kGCgboZAuzssmqTve1E5sXvWu43pWaQ76ROteXflDa95U76KGPgxm6rSAyH0K1xM5ZBwwQ7VdxgXeKfyhPM3OUPPpStZBAngKXQaSpS8Q4bZCOA6pgnaoiaCDQ7UuIF2tEczFmNpZBnesPeCtYtmC6FXAkeHWafohF83pZBZCC9iWH6RH1tmq5IgZDZD",
+    "accessToken": "EAAPx9xDZCgasBPi9SZCpZBBI0p22ZAiSs6NUyhGTILFMH0hwJZAcTLPCwMmRQwdLXPyTyfpeUNfeCTOWE9So64qf42JcL9aoEZAilzXG4dhHmfk0548N5Brkcs8Dz4NlCBz3tNFsnZCtUuXklX6Ctljc3OG0pghLO6CeZCbJkS0BbKNMzZBFNxwOnhdtAXugJWNO1Mo8HR2lvmPB3vplm0o68cOWZA8fFLxiZBf23VXJRTt3i5MXrwZD",
     "phoneNumberId": "800780326455638",
     "verifyToken": "salon_secreto_2024"
   },
@@ -46,6 +46,7 @@
     }
   ]
 }
+
 
 
 
