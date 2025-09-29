@@ -106,90 +106,54 @@
     </div>
 
     <script>
-        const socket = io();
-        let config = {};
+    // Obtener URL del webhook
+    document.getElementById('webhook-url').textContent = window.location.origin + '/webhook';
 
-        // ===============================
-        // SOCKET.IO - TIEMPO REAL
-        // ===============================
-        socket.on('qr', (qrData) => {
-            document.getElementById('qrImage').src = qrData;
-            document.getElementById('qrImage').style.display = 'block';
-            document.getElementById('qrLoading').style.display = 'none';
-            mostrarSeccion('qr');
-        });
+    // Cargar estado
+    function loadStatus() {
+        fetch('/api/status')
+            .then(res => res.json())
+            .then(data => {
+                const statusEl = document.getElementById('estadoSalon');
+                statusEl.textContent = data.isOpen ? 'ABIERTO' : 'CERRADO';
+                statusEl.className = 'status ' + (data.isOpen ? 'connected' : 'disconnected');
+            })
+            .catch(err => console.error('Error:', err));
+    }
 
-        socket.on('connected', () => {
-            mostrarSeccion('conectado');
-            actualizarEstado('connected');
-            mostrarNotificacion('✅ WhatsApp conectado correctamente!', 'success');
-        });
+    // Cargar citas
+    function loadAppointments() {
+        fetch('/api/appointments')
+            .then(res => res.json())
+            .then(appointments => {
+                const container = document.getElementById('citasLista');
+                
+                if (appointments.length === 0) {
+                    container.innerHTML = '<p style="text-align:center;color:#666;">No hay citas</p>';
+                    return;
+                }
 
-        socket.on('disconnected', () => {
-            mostrarSeccion('desconectado');
-            actualizarEstado('disconnected');
-            mostrarNotificacion('❌ WhatsApp desconectado', 'error');
-        });
+                container.innerHTML = appointments.map(apt => `
+                    <div style="border:1px solid #ddd;padding:15px;margin:10px 0;border-radius:8px;">
+                        <div><strong>${apt.dateFormatted}</strong> - ${apt.time}</div>
+                        <div>${apt.service.name} - ${apt.service.price}€</div>
+                        <div>${apt.staff.name}</div>
+                    </div>
+                `).join('');
+                
+                document.getElementById('contadorCitas').textContent = appointments.length;
+            })
+            .catch(err => console.error('Error:', err));
+    }
 
-        socket.on('nueva_cita', (cita) => {
-            mostrarNotificacion(`🎉 Nueva cita: ${cita.servicio} - ${cita.fecha}`, 'success');
-            cargarCitas();
-        });
-
-        socket.on('estado', (estado) => {
-            actualizarEstado(estado.conexion);
-            actualizarEstadoSalon(estado.abierto);
-            document.getElementById('contadorCitas').textContent = estado.citas;
-        });
-
-        // ===============================
-        // FUNCIONES UI
-        // ===============================
-        function mostrarSeccion(seccion) {
-            document.getElementById('qrSection').style.display = seccion === 'qr' ? 'block' : 'none';
-            document.getElementById('conectadoSection').style.display = seccion === 'conectado' ? 'block' : 'none';
-            document.getElementById('desconectadoSection').style.display = seccion === 'desconectado' ? 'block' : 'none';
-        }
-
-        function actualizarEstado(estado) {
-            const el = document.getElementById('estadoConexion');
-            el.className = 'status';
-            
-            switch(estado) {
-                case 'connected':
-                    el.textContent = 'CONECTADO';
-                    el.classList.add('connected');
-                    break;
-                case 'qr_ready':
-                    el.textContent = 'ESPERANDO QR';
-                    el.classList.add('connecting');
-                    break;
-                case 'disconnected':
-                    el.textContent = 'DESCONECTADO';
-                    el.classList.add('disconnected');
-                    break;
-                default:
-                    el.textContent = 'CONECTANDO...';
-                    el.classList.add('connecting');
-            }
-        }
-
-        function actualizarEstadoSalon(abierto) {
-            const el = document.getElementById('estadoSalon');
-            el.textContent = abierto ? 'ABIERTO' : 'CERRADO';
-            el.className = 'status ' + (abierto ? 'connected' : 'disconnected');
-        }
-
-        function mostrarNotificacion(mensaje, tipo) {
-            const div = document.createElement('div');
-            div.className = 'notification';
-            div.textContent = mensaje;
-            document.getElementById('notificaciones').appendChild(div);
-            
-            setTimeout(() => {
-                div.remove();
-            }, 5000);
-        }
+    // Inicializar
+    loadStatus();
+    loadAppointments();
+    setInterval(() => {
+        loadStatus();
+        loadAppointments();
+    }, 5000);
+</script>
 
         // ===============================
         // ACCIONES
@@ -291,4 +255,5 @@
     </script>
 </body>
 </html>
+
 
