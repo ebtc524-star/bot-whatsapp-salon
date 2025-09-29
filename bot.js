@@ -1,277 +1,330 @@
 const express = require('express');
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode');
-const http = require('http');
-const socketIo = require('socket.io');
+const bodyParser = require('body-parser');
+const axios = require('axios');
 const fs = require('fs');
-
-const app = express();
-const server = http.createServer(app);
-const io = socketIo(server);
-
-app.use(express.json());
-app.use(express.static('.'));
+const path = require('path');
 
 // Cargar configuración
-let config = {};
+const config = require('./config.json');
+
+const app = express();
+app.use(bodyParser.json());
+app.use(express.static('.'));
+
+// Base de datos simple en memoria
+let appointments = [];
+let conversations = {};
+
+// Cargar citas guardadas si existen
 try {
-    config = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
+    if (fs.existsSync('appointments.json')) {
+        appointments = JSON.parse(fs.readFileSync('appointments.json', 'utf8'));
+    }
 } catch (error) {
-    console.log('Usando configuración por defecto');
-    config = {
-        salon: { nombre: "Salon María" },
-        horario: { apertura: "09:00", cierre: "20:00", diasLaborables: [1,2,3,4,5,6] },
-        peluqueros: [{ nombre: "María", especialidad: "Corte y Color" }],
-        servicios: [{ nombre: "Corte", precio: 25, duracion: 30 }]
-    };
+    console.log('No hay citas previas guardadas');
 }
 
-// Base de datos simple
-let citas = [];
-let conversaciones = {};
-let clienteWhatsApp = null;
-let qrCodeData = '';
-let estadoConexion = 'disconnected';
+// Guardar citas
+function saveAppointments() {
+    fs.writeFileSync('appointments.json', JSON.stringify(appointments, null, 2));
+}
 
-// ===============================
-// CLIENTE WHATSAPP WEB
-// ===============================
-const client = new Client({
-    authStrategy: new LocalAuth({
-        dataPath: './whatsapp-session'
-    }),
-    puppeteer: {
-        headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-gpu'
-        ]
+// WEBHOOK VERIFICATION (GET) - CRÍTICO PARA META
+app.get('/webhook', (req, res) => {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+    
+    console.log('Verificación webhook recibida:', { mode, token });
+    
+    if (mode === 'subscribe' && token === config.whatsapp.verifyToken) {
+        console.log('✅ Webhook verificado correctamente');
+        res.status(200).send(challenge);
+    } else {
+        console.log('❌ Verificación fallida');
+        res.sendStatus(403);
     }
 });
 
-// ===============================
-// EVENTOS WHATSAPP
-// ===============================
-client.on('qr', (qr) => {
-    console.log('📱 QR Code generado');
-    qrcode.toDataURL(qr, (err, url) => {
-        qrCodeData = url;
-        estadoConexion = 'qr_ready';
-        io.emit('qr', url);
-    });
-});
-
-client.on('ready', () => {
-    console.log('✅ WhatsApp conectado correctamente!');
-    estadoConexion = 'connected';
-    qrCodeData = '';
-    io.emit('connected', true);
-});
-
-client.on('authenticated', () => {
-    console.log('🔐 Autenticación exitosa');
-    estadoConexion = 'authenticated';
-});
-
-client.on('auth_failure', () => {
-    console.log('❌ Error de autenticación');
-    estadoConexion = 'auth_failure';
-    io.emit('auth_failure');
-});
-
-client.on('disconnected', (reason) => {
-    console.log('📱 WhatsApp desconectado:', reason);
-    estadoConexion = 'disconnected';
-    io.emit('disconnected');
-});
-
-client.on('message', async (message) => {
-    if (!message.fromMe && message.body) {
-        const respuesta = procesarMensaje(message.body, message.from);
-        if (respuesta) {
-            await message.reply(respuesta);
+// WEBHOOK MESSAGES (POST) - RECIBIR MENSAJES
+app.post('/webhook', async (req, res) => {
+    res.sendStatus(200); // Responder inmediatamente a WhatsApp
+    
+    try {
+        const body = req.body;
+        
+        if (body.object === 'whatsapp_business_account') {
+            const entry = body.entry?.[0];
+            const changes = entry?.changes?.[0];
+            const value = changes?.value;
+            const messages = value?.messages;
+            
+            if (messages && messages.length > 0) {
+                const message = messages[0];
+                const from = message.from;
+                const text = message.text?.body || '';
+                
+                console.log(`📱 Mensaje recibido de ${from}: ${text}`);
+                
+                // Procesar mensaje
+                await processMessage(from, text);
+            }
         }
+    } catch (error) {
+        console.error('❌ Error procesando webhook:', error);
     }
 });
 
-// ===============================
-// VERIFICAR HORARIO COMERCIAL
-// ===============================
-function estaAbierto() {
-    const ahora = new Date();
-    const hora = ahora.getHours();
-    const minutos = ahora.getMinutes();
-    const diaSemana = ahora.getDay();
-    
-    const horaActual = hora * 60 + minutos;
-    const apertura = parseInt(config.horario.apertura.split(':')[0]) * 60 + parseInt(config.horario.apertura.split(':')[1]);
-    const cierre = parseInt(config.horario.cierre.split(':')[0]) * 60 + parseInt(config.horario.cierre.split(':')[1]);
-    
-    return config.horario.diasLaborables.includes(diaSemana) && 
-           horaActual >= apertura && 
-           horaActual <= cierre;
+// Enviar mensaje de WhatsApp
+async function sendWhatsAppMessage(to, message) {
+    try {
+        const url = `https://graph.facebook.com/v18.0/${config.whatsapp.phoneNumberId}/messages`;
+        
+        await axios.post(url, {
+            messaging_product: 'whatsapp',
+            to: to,
+            text: { body: message }
+        }, {
+            headers: {
+                'Authorization': `Bearer ${config.whatsapp.accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log(`✅ Mensaje enviado a ${to}`);
+    } catch (error) {
+        console.error('❌ Error enviando mensaje:', error.response?.data || error.message);
+    }
 }
 
-// ===============================
-// LÓGICA DEL BOT (IGUAL QUE ANTES)
-// ===============================
-function procesarMensaje(mensaje, telefono) {
-    if (!estaAbierto()) {
-        return `¡Hola! 🌙 ${config.salon.nombre} está cerrado ahora.\n\n🕐 Horario: ${config.horario.apertura} - ${config.horario.cierre}\n📅 ${config.horario.diasLaborables.map(d => ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][d]).join(', ')}\n\n¡Te atenderemos cuando abramos! 😊`;
+// Verificar si está en horario
+function isOpenNow() {
+    const now = new Date();
+    const hour = now.getHours();
+    const day = now.getDay();
+    
+    // Verificar día laborable
+    if (!config.salon.workingDays.includes(day)) {
+        return false;
     }
+    
+    // Verificar hora
+    const openHour = parseInt(config.salon.openTime.split(':')[0]);
+    const closeHour = parseInt(config.salon.closeTime.split(':')[0]);
+    
+    return hour >= openHour && hour < closeHour;
+}
 
-    const estado = conversaciones[telefono] || { paso: 'inicio' };
-    const texto = mensaje.toLowerCase();
+// Obtener saludo según hora
+function getGreeting() {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Buenos días';
+    if (hour < 20) return 'Buenas tardes';
+    return 'Buenas noches';
+}
 
-    switch (estado.paso) {
-        case 'inicio':
-            conversaciones[telefono] = { paso: 'servicio' };
-            return `¡Hola! 😊 Soy Ana de ${config.salon.nombre} 💇‍♀️\n\n¿Qué servicio te gustaría reservar?\n\n${config.servicios.map((s, i) => `${i+1}. ${s.nombre} - ${s.precio}€ (${s.duracion}min)`).join('\n')}`;
-
-        case 'servicio':
-            const numServicio = parseInt(texto);
-            if (numServicio >= 1 && numServicio <= config.servicios.length) {
-                estado.servicio = config.servicios[numServicio - 1];
-                estado.paso = 'peluquero';
-                conversaciones[telefono] = estado;
-                return `¡Perfecto! ✨ Has elegido ${estado.servicio.nombre}\n\n¿Con qué peluquero prefieres?\n\n${config.peluqueros.map((p, i) => `${i+1}. ${p.nombre} - ${p.especialidad}`).join('\n')}\n\nO escribe "cualquiera" si no tienes preferencia 😊`;
-            }
-            return 'Por favor, elige un número de la lista 😊';
-
-        case 'peluquero':
-            if (texto.includes('cualquier')) {
-                estado.peluquero = config.peluqueros[0];
+// Procesar mensaje del usuario
+async function processMessage(from, text) {
+    const lowerText = text.toLowerCase().trim();
+    
+    // Inicializar conversación si no existe
+    if (!conversations[from]) {
+        conversations[from] = {
+            step: 'initial',
+            data: {}
+        };
+    }
+    
+    const conv = conversations[from];
+    
+    // Verificar horario para funcionalidad completa
+    const isOpen = isOpenNow();
+    
+    // PASO 0: Saludo inicial
+    if (conv.step === 'initial') {
+        const greeting = getGreeting();
+        const salonStatus = isOpen ? '' : '\n\n🌙 Aunque el salón está cerrado ahora, estoy aquí para ayudarte las 24 horas.';
+        
+        await sendWhatsAppMessage(from, 
+            `${greeting} 😊 Soy Ana, tu asistente virtual de ${config.salon.name} 💇‍♀️✨${salonStatus}\n\n¿Deseas reservar una cita?\n\nResponde:\n• SI\n• NO`
+        );
+        
+        conv.step = 'confirm_booking';
+        return;
+    }
+    
+    // PASO 1: Confirmar si quiere reservar
+    if (conv.step === 'confirm_booking') {
+        if (lowerText.includes('si') || lowerText.includes('sí')) {
+            // Mostrar servicios
+            let servicesText = '¡Perfecto! 🎉 ¿Qué servicio te gustaría?\n\n';
+            config.services.forEach((service, index) => {
+                servicesText += `${index + 1}. ${service.name} - ${service.price}€ (${service.duration}min)\n`;
+            });
+            servicesText += '\nEscribe el número del servicio que deseas.';
+            
+            await sendWhatsAppMessage(from, servicesText);
+            conv.step = 'select_service';
+        } else {
+            await sendWhatsAppMessage(from, 
+                'Entendido 😊 Si cambias de opinión, escríbeme cuando quieras. ¡Estoy aquí para ayudarte! 💕'
+            );
+            delete conversations[from];
+        }
+        return;
+    }
+    
+    // PASO 2: Seleccionar servicio
+    if (conv.step === 'select_service') {
+        const serviceIndex = parseInt(lowerText) - 1;
+        
+        if (serviceIndex >= 0 && serviceIndex < config.services.length) {
+            conv.data.service = config.services[serviceIndex];
+            
+            // Mostrar peluqueros
+            let staffText = '¡Genial! 😊 ¿Con qué peluquero prefieres?\n\n';
+            config.staff.forEach((person, index) => {
+                staffText += `${index + 1}. ${person.name} - ${person.specialty}\n`;
+            });
+            staffText += `${config.staff.length + 1}. Indiferente\n\nEscribe el número.`;
+            
+            await sendWhatsAppMessage(from, staffText);
+            conv.step = 'select_staff';
+        } else {
+            await sendWhatsAppMessage(from, 
+                'Por favor, escribe un número válido de la lista de servicios.'
+            );
+        }
+        return;
+    }
+    
+    // PASO 3: Seleccionar peluquero
+    if (conv.step === 'select_staff') {
+        const staffIndex = parseInt(lowerText) - 1;
+        
+        if (staffIndex >= 0 && staffIndex <= config.staff.length) {
+            if (staffIndex === config.staff.length) {
+                conv.data.staff = { name: 'Indiferente' };
             } else {
-                const numPeluquero = parseInt(texto);
-                if (numPeluquero >= 1 && numPeluquero <= config.peluqueros.length) {
-                    estado.peluquero = config.peluqueros[numPeluquero - 1];
-                } else {
-                    return 'Por favor, elige un número de la lista o escribe "cualquiera" 😊';
-                }
-            }
-            estado.paso = 'fecha';
-            conversaciones[telefono] = estado;
-            return `¡Genial! Con ${estado.peluquero.nombre} 👏\n\n¿Para qué día y hora?\nEscribe: DD/MM/YYYY HH:MM\n\nEjemplo: 25/12/2024 15:30`;
-
-        case 'fecha':
-            if (texto.includes('/') && texto.includes(':')) {
-                estado.fechaHora = texto;
-                estado.paso = 'confirmar';
-                conversaciones[telefono] = estado;
-                return `🎯 ¡Perfecto! Resumen de tu cita:\n\n📅 ${estado.fechaHora}\n✂️ ${estado.servicio.nombre}\n👤 ${estado.peluquero.nombre}\n💰 ${estado.servicio.precio}€\n\n¿Confirmas esta cita? (Sí/No)`;
-            }
-            return 'Por favor, escribe la fecha y hora así: DD/MM/YYYY HH:MM\nEjemplo: 25/12/2024 15:30';
-
-        case 'confirmar':
-            if (texto.includes('si') || texto.includes('sí') || texto.includes('confirmar')) {
-                const nuevaCita = {
-                    id: Date.now(),
-                    telefono: telefono,
-                    fecha: estado.fechaHora,
-                    servicio: estado.servicio.nombre,
-                    peluquero: estado.peluquero.nombre,
-                    precio: estado.servicio.precio,
-                    confirmada: true,
-                    fechaCreacion: new Date()
-                };
-                citas.push(nuevaCita);
-                delete conversaciones[telefono];
-                
-                // Notificar al panel en tiempo real
-                io.emit('nueva_cita', nuevaCita);
-                
-                return `🎉 ¡CITA CONFIRMADA!\n\nTe esperamos el ${estado.fechaHora} 😊\n\nTe enviaremos un recordatorio 24h antes 📱\n\n¡Gracias por confiar en ${config.salon.nombre}! 💕`;
+                conv.data.staff = config.staff[staffIndex];
             }
             
-            if (texto.includes('no') || texto.includes('cancelar')) {
-                delete conversaciones[telefono];
-                return '😊 No hay problema. ¿Te gustaría elegir otra fecha y hora?\n\nEscribe "hola" para empezar de nuevo.';
-            }
-            
-            return 'Por favor, responde "Sí" para confirmar o "No" para cancelar 😊';
+            // Preguntar fecha y hora
+            await sendWhatsAppMessage(from, 
+                '¡Perfecto! 😊 ¿Para cuándo deseas la cita?\n\nEscribe la fecha y hora así:\n📅 DD/MM/YYYY HH:MM\n\nEjemplo: 15/10/2024 14:30'
+            );
+            conv.step = 'select_datetime';
+        } else {
+            await sendWhatsAppMessage(from, 
+                'Por favor, escribe un número válido de la lista.'
+            );
+        }
+        return;
     }
+    
+    // PASO 4: Seleccionar fecha y hora
+    if (conv.step === 'select_datetime') {
+        // Parsear fecha (formato simple)
+        const dateMatch = text.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/);
+        
+        if (dateMatch) {
+            const [, day, month, year, hour, minute] = dateMatch;
+            const appointmentDate = new Date(year, month - 1, day, hour, minute);
+            
+            conv.data.date = appointmentDate.toISOString();
+            conv.data.dateFormatted = `${day}/${month}/${year}`;
+            conv.data.time = `${hour}:${minute}`;
+            
+            // Mostrar confirmación
+            const confirmText = `
+✨ CONFIRMACIÓN DE CITA ✨
+
+📅 Fecha: ${conv.data.dateFormatted}
+🕐 Hora: ${conv.data.time}
+✂️ Servicio: ${conv.data.service.name}
+💇 Peluquero: ${conv.data.staff.name}
+💰 Precio: ${conv.data.service.price}€
+
+¿Confirmas esta cita?
+
+Responde:
+- CONFIRMA
+- RECHAZA
+            `.trim();
+            
+            await sendWhatsAppMessage(from, confirmText);
+            conv.step = 'confirm_appointment';
+        } else {
+            await sendWhatsAppMessage(from, 
+                '❌ Formato incorrecto.\n\nPor favor escribe así:\n📅 DD/MM/YYYY HH:MM\n\nEjemplo: 25/10/2024 16:00'
+            );
+        }
+        return;
+    }
+    
+    // PASO 5: Confirmar cita
+    if (conv.step === 'confirm_appointment') {
+        if (lowerText.includes('confirma')) {
+            // Guardar cita
+            const appointment = {
+                id: Date.now(),
+                phone: from,
+                ...conv.data,
+                createdAt: new Date().toISOString()
+            };
+            
+            appointments.push(appointment);
+            saveAppointments();
+            
+            await sendWhatsAppMessage(from, 
+                `🎉 ¡CITA CONFIRMADA! 🎉\n\n✅ Tu cita ha sido reservada exitosamente.\n\n📲 Recibirás un recordatorio 24h antes.\n\n⚠️ Para cancelar o modificar, comunícalo con 2h de anticipación.\n\n¡Gracias! Te esperamos en ${config.salon.name} 💕`
+            );
+            
+            // Limpiar conversación
+            delete conversations[from];
+        } else if (lowerText.includes('rechaza')) {
+            await sendWhatsAppMessage(from, 
+                '❌ Cita cancelada. Si deseas reservar otra, escríbeme cuando quieras 😊'
+            );
+            delete conversations[from];
+        } else {
+            await sendWhatsAppMessage(from, 
+                'Por favor responde:\n• CONFIRMA\n• RECHAZA'
+            );
+        }
+        return;
+    }
+    
+    // Mensaje por defecto
+    await sendWhatsAppMessage(from, 
+        'Estoy aquí solo para ayudarte con reservas de citas 😊\n\n¿Deseas reservar una cita? Responde SI o NO.'
+    );
+    conv.step = 'confirm_booking';
 }
 
-// ===============================
-// RUTAS WEB
-// ===============================
-app.get('/', (req, res) => {
-    res.sendFile(__dirname + '/panel.html');
+// API para obtener citas (para el panel)
+app.get('/api/appointments', (req, res) => {
+    res.json(appointments);
 });
 
-app.get('/api/estado', (req, res) => {
+// API para obtener estado
+app.get('/api/status', (req, res) => {
     res.json({
-        estado: estadoConexion,
-        abierto: estaAbierto(),
-        citas: citas.length
+        isOpen: isOpenNow(),
+        appointments: appointments.length,
+        conversations: Object.keys(conversations).length
     });
 });
 
-app.get('/api/qr', (req, res) => {
-    res.json({ qr: qrCodeData });
+// Servir panel
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'panel.html'));
 });
 
-app.get('/api/citas', (req, res) => {
-    res.json(citas);
-});
-
-app.get('/api/config', (req, res) => {
-    res.json(config);
-});
-
-app.post('/api/config', (req, res) => {
-    config = { ...config, ...req.body };
-    fs.writeFileSync('./config.json', JSON.stringify(config, null, 2));
-    res.json({ success: true });
-});
-
-app.post('/api/reconectar', (req, res) => {
-    if (estadoConexion !== 'connected') {
-        client.initialize();
-    }
-    res.json({ success: true });
-});
-
-// ===============================
-// SOCKET.IO PARA TIEMPO REAL
-// ===============================
-io.on('connection', (socket) => {
-    console.log('🔌 Panel conectado');
-    
-    socket.emit('estado', {
-        conexion: estadoConexion,
-        abierto: estaAbierto(),
-        citas: citas.length
-    });
-    
-    if (qrCodeData) {
-        socket.emit('qr', qrCodeData);
-    }
-});
-
-// ===============================
-// INICIAR SERVIDOR Y WHATSAPP
-// ===============================
+// Iniciar servidor
 const PORT = process.env.PORT || 3000;
-
-server.listen(PORT, () => {
-    console.log(`🚀 Bot WhatsApp ejecutándose en puerto ${PORT}`);
-    console.log(`📱 Panel: http://localhost:${PORT}`);
-    console.log('📞 Iniciando WhatsApp Web...');
-    
-    // Inicializar WhatsApp Web
-    client.initialize();
-});
-
-// Manejar cierre limpio
-process.on('SIGINT', async () => {
-    console.log('🛑 Cerrando bot...');
-    await client.destroy();
-    process.exit(0);
+app.listen(PORT, () => {
+    console.log(`🚀 Bot WhatsApp funcionando en puerto ${PORT}`);
+    console.log(`📱 Webhook: /webhook`);
+    console.log(`🌐 Panel: http://localhost:${PORT}`);
 });
